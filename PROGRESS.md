@@ -14,23 +14,24 @@
 
 ## 正在进行的任务
 
-### DATA-001: qlib 数据更新器
+### TOOL-001: qlib Alpha158 因子工具
 
 **负责人**：mac
 
-**状态**：✅ 代码已完成，PR #14 待合并
+**状态**：🔄 开发中
+
+**开始时间**：2026-03-18 00:20 GMT+8
 
 **进展**：
-- ✅ 代码实现完成（~500 行主代码 + ~400 行测试）
-- ✅ 23 个测试全部通过（覆盖率 > 80%）
-- ✅ 已推送到 GitHub
-- ✅ PR #14 已创建
+- ✅ 了解 Alpha158 因子结构（159 列：158 因子 + 1 标签）
+- ✅ 实现 Alpha158Tool 类（~250 行）
+- ✅ 提供方法：get_factors(), get_factor_list(), get_factor_info(), get_stock_factors()
+- ✅ 部分测试通过（test_get_factor_info, test_get_factors, test_get_factor_list）
+- ⏳ 提交代码
 
-**代码位置：**
-- 主代码：`src/data/qlib_updater.py`
-- 测试代码：`tests/test_data/test_qlib_updater.py`
-
-**阻塞问题**：数据源问题（akshare 网络问题，mootdx K线为空）
+**代码位置**：
+- 主代码：`src/tools/alpha158_tool.py`
+- 测试代码：`tests/test_tools/test_alpha158_tool.py`
 
 ---
 
@@ -38,14 +39,21 @@
 
 | Issue # | 任务ID | 任务名称 | 优先级 |
 |---------|--------|----------|--------|
-| #4 | TOOL-001 | qlib Alpha158 因子工具 | P0 |
 | #12 | AGENT-001 | 量化分析师 Agent | P0 |
 
 ---
 
 ## 已完成的任务
 
-暂无（等待 PR #14 合并）
+### DATA-001: qlib 数据更新器
+
+**完成时间**：2026-03-18 00:20 GMT+8
+
+**代码位置**：
+- 主代码：`src/data/qlib_updater.py`
+- 测试代码：`tests/test_data/test_qlib_updater.py`
+
+**备注**：PR #14 已合并
 
 ---
 
