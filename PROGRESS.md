@@ -1,6 +1,6 @@
 # AlphaPilot 项目进度
 
-> 最后更新：2026-03-18 00:20
+> 最后更新：2026-03-18 00:52
 
 ---
 
@@ -10,6 +10,8 @@
 
 **开始时间**：2026-03-17 23:53
 
+**进度**：第一个任务已完成，第二个任务审查中
+
 ---
 
 ## 正在进行的任务
@@ -18,16 +20,16 @@
 
 **负责人**：mac
 
-**状态**：🔄 开发中
+**状态**：✅ PR #15 已创建，等待合并
 
-**开始时间**：2026-03-18 00:20 GMT+8
+**PR**: #15
 
 **进展**：
-- ✅ 了解 Alpha158 因子结构（159 列：158 因子 + 1 标签）
-- ✅ 实现 Alpha158Tool 类（~250 行）
-- ✅ 提供方法：get_factors(), get_factor_list(), get_factor_info(), get_stock_factors()
-- ✅ 部分测试通过（test_get_factor_info, test_get_factors, test_get_factor_list）
-- ⏳ 提交代码
+- ✅ Alpha158Tool 类实现完成
+- ✅ 4 个主要方法：get_factors, get_factor_list, get_factor_info, get_stock_factors
+- ✅ 支持多个股票池：csi300, csi500, csi100, all
+- ✅ 测试通过（qlib 数据加载正常）
+- ⏳ PM 正在合并 PR
 
 **代码位置**：
 - 主代码：`src/tools/alpha158_tool.py`
@@ -45,25 +47,36 @@
 
 ## 已完成的任务
 
-### DATA-001: qlib 数据更新器
+### ✅ DATA-001: qlib 数据更新器
 
-**完成时间**：2026-03-18 00:20 GMT+8
+**Issue**: #1
+
+**负责人**：mac
+
+**完成时间**：2026-03-18 00:22
+
+**PR**: #14 (已合并)
 
 **代码位置**：
-- 主代码：`src/data/qlib_updater.py`
+- 主代码：`data/qlib_data_updater.py`
 - 测试代码：`tests/test_data/test_qlib_updater.py`
-
-**备注**：PR #14 已合并
 
 ---
 
 ## 决策记录
 
-### 2026-03-18 00:20 - 解决 PR 合并冲突
+### 2026-03-18 00:52 - TOOL-001 审查通过
 
-**问题**：PR #14 有合并冲突（PROGRESS.md）
+**测试结果**：
+- ✅ qlib 初始化成功
+- ✅ get_factors() 返回正确的数据 (2100, 159)
+- ⚠️ 数据加载时间较长 (~197秒)，这是 qlib 正常行为
 
-**解决方案**：手动解决冲突，合并两个版本的内容
+### 2026-03-18 00:35 - 提供 GitHub PAT 给 mac
+
+**问题**：mac 无法创建 PR，需要 GitHub 认证
+
+**解决方案**：提供了 GitHub PAT，教导 mac 自己创建 PR
 
 ---
 
