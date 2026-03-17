@@ -16,7 +16,39 @@
 
 ## 正在进行的任务
 
-### 无
+### 🔄 TEST-001: 端到端联调测试
+
+**Issue**: #18
+
+**负责人**：mac
+
+**开始时间**：2026-03-18 01:45
+
+**状态**：测试代码编写完成，准备运行测试
+
+**测试范围**：
+1. 数据流测试：qlib 数据获取 → Alpha158 因子计算
+2. 工具调用测试：Alpha158Tool 初始化和方法
+3. Agent 运行测试：QuantitativeAnalyst 初始化和方法
+4. 端到端测试：输入股票代码 → 输出分析报告
+
+**测试文件**：
+- `tests/test_integration/test_data_flow.py`
+- `tests/test_integration/test_tool_integration.py`
+- `tests/test_integration/test_e2e_quantitative.py`
+
+**已完成**：
+- ✅ 创建 tests/test_integration/ 目录
+- ✅ 编写 test_data_flow.py（数据流测试）
+- ✅ 编写 test_tool_integration.py（工具集成测试）
+- ✅ 编写 test_e2e_quantitative.py（端到端测试）
+- ✅ 本地测试验证（基础测试通过）
+
+**待完成**：
+- ⏳ 运行完整测试套件
+- ⏳ 修复失败的测试（如果有）
+- ⏳ 创建 PR
+- ⏳ 等待 main 审核
 
 ---
 
