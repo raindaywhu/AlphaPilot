@@ -1,6 +1,6 @@
 # AlphaPilot 项目进度
 
-> 最后更新：2026-03-18 01:00
+> 最后更新：2026-03-18 01:45
 
 ---
 
@@ -16,7 +16,35 @@
 
 ## 正在进行的任务
 
-### 无
+### 🔄 TOOL-002: qlib GBDT 预测工具
+
+**Issue**: #5
+
+**负责人**：mac
+
+**开始时间**：2026-03-18 01:12
+
+**状态**：开发完成，等待创建 PR
+
+**代码位置**：
+- 主代码：`src/tools/gbdt_tool.py`
+- 测试代码：`tests/test_tools/test_gbdt_tool.py`
+
+**分支**：`feature/TOOL-002-gbdt-prediction`
+
+**测试结果**：✅ 13 个测试全部通过
+
+**验收标准**：
+- ✅ QlibGBDTPredictionTool 类实现完成
+- ✅ predict() 方法 - 预测股票涨跌幅
+- ✅ get_confidence() 方法 - 获取预测置信度
+- ✅ train_model() 方法 - 训练模型
+- ✅ load_model() 方法 - 加载预训练模型
+- ✅ 预测历史记录跟踪
+- ✅ 完整的单元测试
+
+**待办**：
+- ⏳ 创建 Pull Request（需要 GitHub 认证）
 
 ---
 
