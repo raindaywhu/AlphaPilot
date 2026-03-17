@@ -5,5 +5,6 @@ Tools 模块
 """
 
 from .alpha158_tool import Alpha158Tool
+from .technical_indicators import TechnicalIndicatorTool
 
-__all__ = ['Alpha158Tool']
+__all__ = ['Alpha158Tool', 'TechnicalIndicatorTool']
