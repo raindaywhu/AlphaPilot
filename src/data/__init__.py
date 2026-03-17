@@ -6,8 +6,10 @@
 
 from .qlib_updater import QlibDataUpdater
 from .mootdx_fetcher import MootdxDataFetcher
+from .data_converter import DataConverter
 
 __all__ = [
     'QlibDataUpdater',
     'MootdxDataFetcher',
+    'DataConverter',
 ]
