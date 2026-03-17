@@ -7,10 +7,15 @@
 Issue: #12 (AGENT-001)
 """
 
+import os
 import json
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
+
+# 设置环境变量以绕过 CrewAI 的 OPENAI_API_KEY 检查
+# 我们使用自定义 LLM（GLM-5），不需要 OpenAI
+os.environ.setdefault('OPENAI_API_KEY', 'sk-dummy-key-for-crewai')
 
 from crewai import Agent
 from langchain_openai import ChatOpenAI
@@ -122,7 +127,8 @@ class QuantitativeAnalyst:
 - 风险提示，负责任的分析
 - **详细展示评级结果和逻辑推导**""",
 
-            tools=[self.alpha158_tool],
+            # 注意：不使用 tools 参数，因为 Alpha158Tool 不是 CrewAI BaseTool
+            # 直接在 analyze() 方法中调用 self.alpha158_tool
 
             llm=self.llm,
 
