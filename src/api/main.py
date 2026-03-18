@@ -1,20 +1,23 @@
 """
 AlphaPilot API - 分析接口
 
-提供股票分析 REST API + 飞书机器人 Webhook
+提供股票分析 REST API + Web UI
 
-Issue: #20 (API-001), #21 (UI-001)
+Issue: #20 (API-001), #21 (UI-001), #32 (UI-002)
 """
 
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List
 import logging
 from datetime import datetime
 import json
 import re
+import os
+from pathlib import Path
 
 # 导入 Crew
 import sys
@@ -41,6 +44,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 配置静态文件服务 (Web UI)
+WEB_DIR = Path(__file__).parent.parent / "web"
+if WEB_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
 
 # ============== 数据模型 ==============
@@ -73,6 +81,21 @@ class HealthResponse(BaseModel):
     status: str
     timestamp: str
     version: str
+
+
+# ============== Web UI ==============
+
+@app.get("/", response_class=HTMLResponse, tags=["Web UI"])
+async def root():
+    """
+    Web UI 入口
+    
+    返回分析界面 HTML
+    """
+    index_file = WEB_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file), media_type="text/html")
+    return HTMLResponse(content="<h1>AlphaPilot Web UI</h1><p>请访问 /docs 查看 API 文档</p>")
 
 
 # ============== API 接口 ==============

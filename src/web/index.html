@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlphaPilot - A股智能投资分析系统</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <h1>🚀 AlphaPilot</h1>
+            <p class="subtitle">A股智能投资分析系统</p>
+        </header>
+
+        <!-- 输入区域 -->
+        <div class="input-section">
+            <div class="input-group">
+                <label for="stockCode">股票代码</label>
+                <input type="text" id="stockCode" placeholder="输入股票代码，如 600519" />
+            </div>
+            <div class="input-group">
+                <label for="timeHorizon">预测周期（天）</label>
+                <input type="number" id="timeHorizon" value="5" min="1" max="30" />
+            </div>
+            <div class="input-group checkbox-group">
+                <label>
+                    <input type="checkbox" id="parallelMode" checked />
+                    并行分析模式
+                </label>
+            </div>
+            <button id="analyzeBtn" class="analyze-btn">
+                <span class="btn-text">开始分析</span>
+                <span class="btn-loading" style="display: none;">
+                    <span class="spinner"></span> 分析中...
+                </span>
+            </button>
+        </div>
+
+        <!-- 结果区域 -->
+        <div id="resultSection" class="result-section" style="display: none;">
+            <!-- 综合评级 -->
+            <div class="rating-card">
+                <div class="rating-header">
+                    <h2>综合评级</h2>
+                    <span id="stockCodeDisplay" class="stock-code"></span>
+                </div>
+                <div class="rating-body">
+                    <div class="rating-main">
+                        <span id="overallRating" class="rating-value"></span>
+                    </div>
+                    <div class="rating-details">
+                        <div class="detail-item">
+                            <span class="label">置信度</span>
+                            <span id="confidence" class="value"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">得分</span>
+                            <span id="score" class="value"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">分析日期</span>
+                            <span id="analysisDate" class="value"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agent 结果 -->
+            <div class="agent-results">
+                <!-- 量化分析 -->
+                <div class="agent-card">
+                    <div class="agent-header">
+                        <span class="agent-icon">📊</span>
+                        <h3>量化分析</h3>
+                    </div>
+                    <div id="quantitativeResult" class="agent-body">
+                        <p class="loading-text">等待分析...</p>
+                    </div>
+                </div>
+
+                <!-- 宏观分析 -->
+                <div class="agent-card">
+                    <div class="agent-header">
+                        <span class="agent-icon">🌍</span>
+                        <h3>宏观分析</h3>
+                    </div>
+                    <div id="macroResult" class="agent-body">
+                        <p class="loading-text">等待分析...</p>
+                    </div>
+                </div>
+
+                <!-- 另类分析 -->
+                <div class="agent-card">
+                    <div class="agent-header">
+                        <span class="agent-icon">🔍</span>
+                        <h3>另类分析</h3>
+                    </div>
+                    <div id="alternativeResult" class="agent-body">
+                        <p class="loading-text">等待分析...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 投资建议 -->
+            <div class="summary-card">
+                <h3>💡 投资建议</h3>
+                <div id="summary" class="summary-content"></div>
+            </div>
+
+            <!-- 风险提示 -->
+            <div id="riskSection" class="risk-card" style="display: none;">
+                <h3>⚠️ 风险提示</h3>
+                <ul id="riskWarnings" class="risk-list"></ul>
+            </div>
+
+            <!-- 执行时间 -->
+            <div class="execution-info">
+                <span>⏱️ 执行时间: <span id="executionTime"></span></span>
+            </div>
+        </div>
+
+        <!-- 错误提示 -->
+        <div id="errorSection" class="error-section" style="display: none;">
+            <div class="error-card">
+                <span class="error-icon">❌</span>
+                <p id="errorMessage"></p>
+            </div>
+        </div>
+
+        <!-- 免责声明 -->
+        <footer class="footer">
+            <p class="disclaimer">
+                ⚠️ 免责声明：本系统仅供学习和研究目的，不构成任何投资建议。投资有风险，入市需谨慎。
+            </p>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
