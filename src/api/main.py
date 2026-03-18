@@ -55,12 +55,13 @@ if WEB_DIR.exists():
 stock_name_tool = StockNameQueryTool()
 
 
-# ============== 数据模型 ==============
+# ======= 数据模型 ==============
 
 class AnalyzeRequest(BaseModel):
     """股票分析请求"""
     stock_code: str = Field(..., description="股票代码或名称，如 SH600519 或 贵州茅台", example="贵州茅台")
-    parallel: bool = Field(True, description="是否并行分析")
+    parallel: bool = Field(False, description="是否并行分析（默认禁用以减少 CPU 消耗）")
+
     time_horizon: int = Field(5, description="预测周期（天）", ge=1, le=30)
 
 
@@ -110,7 +111,7 @@ class HealthResponse(BaseModel):
     version: str
 
 
-# ============== Web UI ==============
+# ======= Web UI ==============
 
 @app.get("/", response_class=HTMLResponse, tags=["Web UI"])
 async def root():
@@ -125,7 +126,7 @@ async def root():
     return HTMLResponse(content="<h1>AlphaPilot Web UI</h1><p>请访问 /docs 查看 API 文档</p>")
 
 
-# ============== API 接口 ==============
+# ======= API 接口 ==============
 
 @app.get("/api/health", response_model=HealthResponse, tags=["系统"])
 async def health_check():
@@ -200,10 +201,28 @@ async def analyze_stock(request: AnalyzeRequest):
     
     执行量化、基本面、宏观、另类、风控五维分析
     
+
     - **stock_code**: 股票代码或名称，如 SH600519、贵州茅台、茅台
-    - **parallel**: 是否并行分析（默认 True）
+    - **parallel**: 是否并行分析（默认 False）
     - **time_horizon**: 预测周期（天）
     """
+
+- **stock_code**: 股票代码或名称，如 SH600519、贵州茅台、茅台
+    - **parallel**: 是否并行分析（默认 False）
+    - **time_horizon**: 预测周期（天）
+    """
+    # 查询股票信息（支持名称或代码）
+    # 使用实例方法查询股票
+    query_result = stock_name_tool.query(request.stock_code)
+    if not query_result['success']:
+        raise HTTPException(status_code=400, detail=f"无法识别股票: {request.stock_code}")
+    
+    stock_code = query_result['full_code']
+    stock_name = query_result['name']
+    
+    logger.info(f"开始分析股票: {stock_name} ({stock_code})")
+    
+
     try:
         # 支持股票名称输入，自动转换为代码
         stock_code = request.stock_code
@@ -357,7 +376,7 @@ async def analyze_alternative(request: AnalyzeRequest):
 
 
 
-# ============== 启动脚本 ==============
+# ======= 启动脚本 ==============
 
 if __name__ == "__main__":
     import uvicorn
