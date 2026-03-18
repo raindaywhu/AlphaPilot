@@ -108,8 +108,6 @@ class QlibGBDTPredictionTool:
                 - timestamp: 预测时间
                 - confidence: 置信度
         """
-        self._ensure_initialized()
-        
         # 默认使用最近 1 年的数据
         if end_time is None:
             end_time = datetime.now().strftime('%Y-%m-%d')
@@ -119,6 +117,8 @@ class QlibGBDTPredictionTool:
         logger.info(f"预测股票 {stock_code}, 周期 {horizon} 天")
         
         try:
+            # 确保 qlib 已初始化（移到 try 块内）
+            self._ensure_initialized()
             # 创建数据集
             dataset = self._create_dataset(
                 instruments=[stock_code],
