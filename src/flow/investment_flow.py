@@ -21,7 +21,7 @@ from src.agents.quantitative import QuantitativeAnalyst
 from src.agents.fundamental import FundamentalAnalyst
 from src.agents.macro import MacroAnalyst
 from src.agents.alternative import AlternativeAnalyst
-from src.agents.risk_manager import RiskManager
+from src.agents.risk_manager import RiskManagerAgent
 from src.agents.decision_maker import DecisionMaker
 
 # 导入 Tools
@@ -54,7 +54,7 @@ class InvestmentAnalysisFlow:
         self.fund_analyst = FundamentalAnalyst()
         self.macro_analyst = MacroAnalyst()
         self.alt_analyst = AlternativeAnalyst()
-        self.risk_manager = RiskManager()
+        self.risk_manager = RiskManagerAgent()
         self.decision_maker = DecisionMaker()
         
         # 初始化工具
