@@ -63,17 +63,20 @@ class AnalyzeRequest(BaseModel):
 class AnalyzeResponse(BaseModel):
     """股票分析响应"""
     stock_code: str
+    stock_name: str = ""
     analysis_date: str
-    overall_rating: str  # 综合评级：看涨/中性偏多/中性/中性偏空/看跌
+    overall_rating: str  # buy/hold/sell
     confidence: float
-    score: float = Field(0.5, description="数值化得分 0-1")
-    quantitative: Dict[str, Any]
-    macro: Dict[str, Any]
-    alternative: Dict[str, Any]
-    summary: str
+    recommendation: str = ""
+    quantitative: Dict[str, Any] = {}
+    fundamental: Dict[str, Any] = {}
+    macro: Dict[str, Any] = {}
+    alternative: Dict[str, Any] = {}
+    risk: Dict[str, Any] = {}
+    summary: str = ""
     risk_warnings: List[str] = Field(default_factory=list)
     disclaimer: str = ""
-    execution_time: str
+    execution_time: str = ""
 
 
 class HealthResponse(BaseModel):
@@ -119,7 +122,7 @@ async def analyze_stock(request: AnalyzeRequest):
     """
     股票综合分析接口
     
-    执行量化、宏观、另类三维分析
+    执行量化、基本面、宏观、另类、风控五维分析
     
     - **stock_code**: 股票代码，如 SH600519
     - **parallel**: 是否并行分析（默认 True）
@@ -139,15 +142,31 @@ async def analyze_stock(request: AnalyzeRequest):
         )
         
         # 构造响应
+        agent_results = result.get("agent_results", {})
+        
+        # 映射评级
+        rating_map = {
+            "看涨": "buy",
+            "中性偏多": "buy",
+            "中性": "hold",
+            "中性偏空": "sell",
+            "看跌": "sell"
+        }
+        overall = result.get("overall_rating", "中性")
+        rating = rating_map.get(overall, "hold")
+        
         response = AnalyzeResponse(
             stock_code=result.get("stock_code", request.stock_code),
+            stock_name=result.get("stock_name", ""),
             analysis_date=result.get("analysis_date", datetime.now().strftime("%Y-%m-%d")),
-            overall_rating=result.get("overall_rating", "中性"),
+            overall_rating=rating,
             confidence=result.get("confidence", 0.5),
-            score=result.get("score", 0.5),
-            quantitative=result.get("agent_results", {}).get("quantitative", {}),
-            macro=result.get("agent_results", {}).get("macro", {}),
-            alternative=result.get("agent_results", {}).get("alternative", {}),
+            recommendation=result.get("recommendation", ""),
+            quantitative=agent_results.get("quantitative", {}),
+            fundamental=agent_results.get("fundamental", {}),
+            macro=agent_results.get("macro", {}),
+            alternative=agent_results.get("alternative", {}),
+            risk=agent_results.get("risk", {}),
             summary=result.get("summary", ""),
             risk_warnings=result.get("risk_warnings", []),
             disclaimer=result.get("disclaimer", ""),
