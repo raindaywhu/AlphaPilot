@@ -9,49 +9,66 @@
 
 ## 当前状态
 
-**阶段**：V1 MVP 开发阶段 → Roadmap 2 + 技术债务修复 🔧
-**整体进度**：🎉 **Roadmap 1（第一阶段 MVP）100% 完成！** → **API-001 已完成，正在修复技术债务**
-**更新时间**：2026-03-18 11:26
+**阶段**：V1 MVP 开发阶段 → Roadmap 2 进行中 🚀
+**整体进度**：🎉 **Roadmap 1（第一阶段 MVP）100% 完成！** → **API-001 已完成，UI-001 开发中**
+**更新时间**：2026-03-18 11:22
 
 ---
 
-## PM 心跳检查（2026-03-18 11:26）
+## mac 开发心跳检查（2026-03-18 11:20）
 
-### 🔴 用户反馈
-- 11:14:58 楚翼反馈：**系统质量太差，质疑设计方案**
-  - 问题：量化分析数据缺失（福耀玻璃不在沪深300）
-  - 问题：Agent 返回数据为空
-  - 问题：报告质量不足
+### 📋 认领任务
+- ✅ 认领 UI-001 飞书机器人开发 (Issue #21)
 
-### 📋 问题根因分析（jack 提供）
-1. **量化数据覆盖不足**：qlib 只加载了 csi300 数据
-2. **Agent 返回数据丢失**：宏观/另类 Agent 返回字段不一致
-3. **系统健壮性不足**：数据缺失时直接失败
+### 🔧 开发进度
+**UI-001 飞书机器人开发中**
 
-### 🔧 修复进展（mac 执行中）
-- ✅ **TECH-001**: 修复 Agent 返回数据丢失
-  - commit 517569a: fix(agents): 修复 Agent 返回数据丢失问题
-  - 修改宏观分析师：返回 `overall_rating` 而不是 `macro_view`
-  - 修改另类分析师：返回 `overall_rating` 和 `conclusion`
-- 🔄 **TECH-002**: 扩展量化数据源
-  - 正在创建 TechnicalIndicatorsTool 使用 akshare
-  - 支持全 A 股 K 线数据
-  - 自己计算 MA、MACD、RSI 等指标
+#### 已完成工作
+1. ✅ 创建 `src/bot/` 模块目录结构
+2. ✅ 实现 `AlphaPilotBot` 核心类
+   - 飞书认证（tenant_access_token）
+   - 消息发送（文本、卡片）
+   - API 调用（分析接口）
+3. ✅ 实现 `CommandHandler` 命令处理器
+   - `/analyze <股票代码>` - 综合分析
+   - `/quant <股票代码>` - 量化分析
+   - `/macro <股票代码>` - 宏观分析
+   - `/alt <股票代码>` - 另类分析
+   - `/help` - 帮助信息
+4. ✅ 实现 `CardBuilder` 消息卡片构建器
+   - 分析结果卡片
+   - 错误提示卡片
+5. ✅ 实现 Webhook 服务器
+   - 飞书事件回调处理
+   - URL 验证
+   - 消息事件处理
+6. ✅ 更新 `requirements.txt` 添加依赖
+   - `httpx>=0.25.0`
+   - `lark-oapi>=1.2.0`
+7. ✅ 编写测试 `tests/test_bot.py`
+   - 15 个测试全部通过 ✅
+8. ✅ 编写 README 文档 `src/bot/README.md`
 
-### 项目状态总结
-- 🎉 **API-001 完成**：REST API 分析接口已上线
-- 🔧 **技术债务修复中**：mac 正在修复数据覆盖和 Agent 返回问题
-- 📋 **下一步**：完成技术债务修复后继续 UI-001
+#### 文件清单
+```
+src/bot/
+├── __init__.py      # 模块入口
+├── bot.py           # 机器人核心实现
+├── handlers.py      # 命令处理器
+├── cards.py         # 消息卡片构建器
+├── webhook.py       # Webhook 服务器
+└── README.md        # 使用文档
+```
 
-### GitHub 提交记录
-- 517569a fix(agents): 修复 Agent 返回数据丢失问题
-- d1ec70a docs: update PM heartbeat check 11:11
-- 228a14b fix(api): 修复 overall_rating 数据格式问题
+### 测试结果
+```
+tests/test_bot.py - 15 passed ✅
+```
 
-### 下一步行动
-1. mac 完成 TECH-002 量化数据源扩展
-2. 重新测试福耀玻璃分析
-3. 验证报告质量改进
+### 下一步
+- 📋 提交代码到 GitHub
+- 📋 更新 PROGRESS.md
+- 📋 创建 PR
 
 ---
 
