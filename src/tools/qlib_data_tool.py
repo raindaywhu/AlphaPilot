@@ -1,9 +1,11 @@
 """
 Qlib 数据工具
 
-从 qlib 数据层获取 A 股行情数据。
+从 qlib 数据层获取 A 股行情数据，支持回退到 mootdx。
 
-数据流: mootdx → qlib_updater → qlib → QlibDataTool → Agent
+数据流: 
+1. 优先从 qlib 获取数据
+2. 如果 qlib 没有数据，回退到 mootdx
 
 Issue: #33 DATA-FIX
 """
@@ -21,6 +23,14 @@ from qlib.data.dataset import DatasetH
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# mootdx 回退导入
+try:
+    from mootdx.quotes import Quotes
+    MOOTDX_AVAILABLE = True
+except ImportError:
+    MOOTDX_AVAILABLE = False
+    logger.warning("mootdx 未安装，无法回退获取数据")
 
 
 class QlibDataTool:
@@ -84,6 +94,8 @@ class QlibDataTool:
         """
         获取 K 线数据
         
+        优先从 qlib 获取，如果 qlib 没有数据则回退到 mootdx。
+        
         Args:
             symbol: 股票代码（如 sh600519）
             days: 获取天数（如果未指定日期范围）
@@ -93,16 +105,34 @@ class QlibDataTool:
         Returns:
             K线数据 DataFrame
         """
-        self._ensure_initialized()
+        # 先尝试从 qlib 获取
+        df = self._get_kline_from_qlib(symbol, days, start_date, end_date)
         
+        if df is not None and len(df) > 0:
+            return df
+        
+        # qlib 没有数据，回退到 mootdx
+        logger.info(f"qlib 没有 {symbol} 的数据，尝试从 mootdx 获取...")
+        return self._get_kline_from_mootdx(symbol, days)
+    
+    def _get_kline_from_qlib(
+        self,
+        symbol: str,
+        days: int = 100,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> Optional[pd.DataFrame]:
+        """从 qlib 获取 K 线数据"""
         try:
+            self._ensure_initialized()
+            
             # 标准化股票代码
-            if not symbol.startswith(('sh', 'sz')):
-                symbol = symbol.lower()
-                if symbol.startswith('6'):
-                    symbol = f'sh{symbol}'
+            qlib_symbol = symbol.lower()
+            if not qlib_symbol.startswith(('sh', 'sz')):
+                if qlib_symbol.startswith('6'):
+                    qlib_symbol = f'sh{qlib_symbol}'
                 else:
-                    symbol = f'sz{symbol}'
+                    qlib_symbol = f'sz{qlib_symbol}'
             
             # 计算日期范围
             if end_date is None:
@@ -121,14 +151,13 @@ class QlibDataTool:
             
             # 从 qlib 获取数据
             data = D.features(
-                instruments=[symbol],
+                instruments=[qlib_symbol],
                 fields=fields,
                 start_time=start_date,
                 end_time=end_date
             )
             
             if data is None or len(data) == 0:
-                logger.warning(f"qlib 中没有 {symbol} 的数据")
                 return None
             
             # 重置索引，整理列名
@@ -138,11 +167,67 @@ class QlibDataTool:
             # 按日期排序
             df = df.sort_values('datetime').tail(days)
             
-            logger.info(f"成功从 qlib 获取 {symbol} 的数据: {len(df)} 条")
+            logger.info(f"从 qlib 获取 {symbol} 的数据: {len(df)} 条")
             return df
             
         except Exception as e:
-            logger.error(f"获取 qlib 数据失败: {e}")
+            logger.warning(f"qlib 获取数据失败: {e}")
+            return None
+    
+    def _get_kline_from_mootdx(
+        self,
+        symbol: str,
+        days: int = 100
+    ) -> Optional[pd.DataFrame]:
+        """从 mootdx 获取 K 线数据（回退方案）"""
+        if not MOOTDX_AVAILABLE:
+            logger.error("mootdx 不可用，无法获取数据")
+            return None
+        
+        try:
+            # 标准化股票代码
+            mootdx_symbol = symbol.lower().replace('sh', '').replace('sz', '')
+            market = 1 if symbol.lower().startswith('sh') or symbol.startswith('6') else 0
+            
+            # 创建 mootdx 客户端
+            client = Quotes.factory(market='std')
+            
+            # 获取日K线数据
+            bars = client.bars(
+                code=mootdx_symbol,
+                frequency=9,  # 日K
+                offset=days,
+                start=0
+            )
+            
+            if bars is None or len(bars) == 0:
+                logger.warning(f"mootdx 也没有 {symbol} 的数据")
+                return None
+            
+            # 转换为 DataFrame
+            df = pd.DataFrame(bars)
+            
+            # 重命名列
+            df = df.rename(columns={
+                'open': 'open',
+                'close': 'close',
+                'high': 'high',
+                'low': 'low',
+                'vol': 'volume'
+            })
+            
+            # 添加日期列
+            if 'datetime' not in df.columns:
+                df['datetime'] = pd.to_datetime(df.index)
+            
+            # 按日期排序
+            df = df.sort_values('datetime').tail(days)
+            
+            logger.info(f"从 mootdx 获取 {symbol} 的数据: {len(df)} 条")
+            return df[['datetime', 'open', 'close', 'high', 'low', 'volume']]
+            
+        except Exception as e:
+            logger.error(f"mootdx 获取数据失败: {e}")
             return None
     
     def calculate_ma(self, df: pd.DataFrame, periods: List[int] = [5, 10, 20, 60]) -> pd.DataFrame:
