@@ -212,14 +212,21 @@ class RAGManager:
             搜索结果列表
         """
         if self.collection is None:
+            # 使用 Ollama 嵌入函数创建集合
+            embedding_func = OllamaEmbeddingFunction(self.embedding_model)
             self.collection = self.client.get_or_create_collection(
                 name=self.collection_name,
+                embedding_function=embedding_func,
                 metadata={"hnsw:space": "cosine"}
             )
         
-        # 执行搜索
+        # 使用 Ollama 嵌入查询
+        embedding_func = OllamaEmbeddingFunction(self.embedding_model)
+        query_embedding = embedding_func([query])[0]
+        
+        # 执行搜索（使用预计算的嵌入向量）
         results = self.collection.query(
-            query_texts=[query],
+            query_embeddings=[query_embedding],
             n_results=top_k,
             where=filter_metadata
         )
