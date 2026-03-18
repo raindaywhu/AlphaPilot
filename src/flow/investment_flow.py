@@ -116,8 +116,9 @@ class InvestmentAnalysisFlow:
                 "analysis_date": datetime.now().strftime("%Y-%m-%d"),
                 "agent_results": self.state["analysis_results"],
                 "risk_assessment": self.state["risk_assessment"],
-                "overall_rating": self.state["final_decision"].get("rating", "中性"),
-                "recommendation": self.state["final_decision"].get("recommendation", ""),
+                "overall_rating": self.state["final_decision"].get("decision", "持有"),
+                "confidence": self.state["final_decision"].get("confidence", 0.5),
+                "recommendation": self.state["final_decision"].get("conclusion", ""),
                 "report_path": self.state["report_path"],
                 "execution_time": execution_time
             }
