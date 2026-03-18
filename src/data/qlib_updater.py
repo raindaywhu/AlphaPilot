@@ -318,11 +318,13 @@ class QlibDataUpdater:
                 try:
                     # 使用 mootdx 获取日线数据
                     # 注意: mootdx 的频率参数: 9=日线
+                    # 移除股票代码前缀（sh/sz）
+                    stock_code_num = stock[2:] if stock.startswith(('sh', 'sz')) else stock
+                    
                     data = self.quotes.bars(
-                        code=stock,
+                        symbol=stock_code_num,
                         frequency=9,
-                        start=0,
-                        offset=500  # 获取最近 500 天的数据
+                        count=3000  # 获取最近 3000 天的数据（约 12 年）
                     )
                     
                     if data is not None and len(data) > 0:
@@ -404,40 +406,71 @@ class QlibDataUpdater:
                     stock_dir = self.features_dir / stock_code
                     stock_dir.mkdir(parents=True, exist_ok=True)
                     
-                    # 转换每一天的数据
+                    # qlib 正确格式：每个特征一个文件，包含所有日期的数据
+                    # 确保按日期排序
+                    if 'datetime' in df.columns:
+                        df['datetime'] = pd.to_datetime(df['datetime'])
+                        df = df.sort_values('datetime')
+                    
+                    # 提取所有日期的数据
+                    opens = []
+                    closes = []
+                    highs = []
+                    lows = []
+                    volumes = []
+                    amounts = []
+                    
                     for _, row in df.iterrows():
                         try:
-                            # 提取日期
-                            if 'datetime' in row:
-                                date = pd.to_datetime(row['datetime']).strftime("%Y-%m-%d")
-                            else:
+                            if 'datetime' not in row:
                                 continue
                             
-                            # 提取特征
-                            features = [
-                                float(row.get('open', 0)),
-                                float(row.get('close', 0)),
-                                float(row.get('high', 0)),
-                                float(row.get('low', 0)),
-                                float(row.get('volume', 0)),
-                                float(row.get('amount', 0))
-                            ]
-                            
-                            # 写入二进制文件
-                            file_path = stock_dir / f"{stock_code}_{date}.bin"
-                            with open(file_path, 'wb') as f:
-                                for feature in features:
-                                    f.write(struct.pack('f', feature))
-                            
-                            success_count += 1
+                            opens.append(float(row.get('open', 0)))
+                            closes.append(float(row.get('close', 0)))
+                            highs.append(float(row.get('high', 0)))
+                            lows.append(float(row.get('low', 0)))
+                            volumes.append(float(row.get('volume', 0)))
+                            amounts.append(float(row.get('amount', 0)))
                             
                         except Exception as e:
                             continue
                     
+                    if not opens:
+                        continue
+                    
+                    # 写入每个特征的二进制文件
+                    # qlib 格式：close.day.bin, open.day.bin 等
+                    features_data = {
+                        'close.day.bin': closes,
+                        'open.day.bin': opens,
+                        'high.day.bin': highs,
+                        'low.day.bin': lows,
+                        'volume.day.bin': volumes,
+                        'amount.day.bin': amounts,
+                        # 添加 change 和 factor 字段
+                        'change.day.bin': [0.0] * len(closes),  # 暂时填充 0
+                        'factor.day.bin': [1.0] * len(closes),  # 复权因子默认 1
+                    }
+                    
+                    for feature_file, values in features_data.items():
+                        file_path = stock_dir / feature_file
+                        with open(file_path, 'wb') as f:
+                            for val in values:
+                                f.write(struct.pack('f', float(val)))
+                    
+                    success_count += len(opens)
+                    
                 except Exception as e:
+                    print(f"处理 {temp_file} 时出错: {e}")
                     continue
             
             print(f"成功转换 {success_count} 个数据点")
+            
+            # 更新 instruments 文件
+            self._update_instruments_file()
+            
+            # 更新日历文件
+            self._update_calendar_file()
             
             # 清理临时文件
             self._cleanup_temp_files()
@@ -536,6 +569,124 @@ class QlibDataUpdater:
             data.to_csv(self.temp_dir / f"{stock}.csv", index=False)
         except Exception as e:
             print(f"保存临时数据时出错: {e}")
+    
+    def _update_instruments_file(self):
+        """
+        更新 instruments 文件
+        
+        将新更新的股票添加到 all.txt 文件中
+        """
+        try:
+            instruments_file = self.data_dir / "instruments" / "all.txt"
+            instruments_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            # 读取现有股票列表
+            existing_stocks = set()
+            stock_info = {}  # stock_code -> (start_date, end_date)
+            
+            if instruments_file.exists():
+                with open(instruments_file, 'r') as f:
+                    for line in f:
+                        parts = line.strip().split('\t')
+                        if len(parts) >= 3:
+                            stock_code = parts[0]
+                            start_date = parts[1]
+                            end_date = parts[2]
+                            existing_stocks.add(stock_code)
+                            stock_info[stock_code] = (start_date, end_date)
+            
+            # 扫描 features 目录获取新股票
+            new_stocks = []
+            today = datetime.now().strftime("%Y-%m-%d")
+            
+            for stock_dir in self.features_dir.iterdir():
+                if not stock_dir.is_dir():
+                    continue
+                
+                stock_code = stock_dir.name.upper()  # qlib 使用大写
+                
+                # 获取该股票的日期范围
+                # 新格式：close.day.bin 包含所有日期
+                close_file = stock_dir / "close.day.bin"
+                if close_file.exists():
+                    # 从 close.day.bin 文件大小计算日期数
+                    file_size = close_file.stat().st_size
+                    num_dates = file_size // 4  # 每个 float32 占 4 字节
+                    
+                    # 尝试从临时 CSV 获取日期范围
+                    temp_csv = self.temp_dir / f"{stock_code.lower()}.csv"
+                    if temp_csv.exists():
+                        try:
+                            df = pd.read_csv(temp_csv)
+                            if 'datetime' in df.columns and not df.empty:
+                                df['datetime'] = pd.to_datetime(df['datetime'])
+                                start_date = df['datetime'].min().strftime("%Y-%m-%d")
+                                end_date = df['datetime'].max().strftime("%Y-%m-%d")
+                                
+                                if stock_code not in existing_stocks:
+                                    new_stocks.append((stock_code, start_date, end_date))
+                                else:
+                                    # 更新现有股票的日期范围
+                                    stock_info[stock_code] = (start_date, end_date)
+                        except:
+                            pass
+            
+            # 重写整个 instruments 文件
+            with open(instruments_file, 'w') as f:
+                # 先写现有股票
+                for stock_code, (start_date, end_date) in stock_info.items():
+                    f.write(f"{stock_code}\t{start_date}\t{end_date}\n")
+                # 再写新股票
+                for stock_code, start_date, end_date in new_stocks:
+                    f.write(f"{stock_code}\t{start_date}\t{end_date}\n")
+            
+            if new_stocks:
+                print(f"更新 instruments 文件: 新增 {len(new_stocks)} 只股票")
+            
+        except Exception as e:
+            print(f"更新 instruments 文件时出错: {e}")
+    
+    def _update_calendar_file(self):
+        """
+        更新日历文件
+        
+        qlib 需要日历文件来知道哪些日期是交易日
+        """
+        try:
+            calendar_file = self.data_dir / "calendars" / "day.txt"
+            calendar_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            # 收集所有交易日
+            all_dates = set()
+            
+            # 从临时 CSV 文件中提取日期
+            if self.temp_dir.exists():
+                for temp_csv in self.temp_dir.glob("*.csv"):
+                    try:
+                        df = pd.read_csv(temp_csv)
+                        if 'datetime' in df.columns:
+                            for dt in pd.to_datetime(df['datetime']):
+                                all_dates.add(dt.strftime("%Y-%m-%d"))
+                    except:
+                        pass
+            
+            # 如果有现有日历文件，读取并合并
+            if calendar_file.exists():
+                with open(calendar_file, 'r') as f:
+                    for line in f:
+                        all_dates.add(line.strip())
+            
+            # 写入日历文件
+            sorted_dates = sorted(all_dates)
+            with open(calendar_file, 'w') as f:
+                for date in sorted_dates:
+                    f.write(f"{date}\n")
+            
+            if sorted_dates:
+                print(f"更新日历文件: {sorted_dates[0]} 到 {sorted_dates[-1]} ({len(sorted_dates)} 个交易日)")
+            
+        except Exception as e:
+            print(f"更新日历文件时出错: {e}")
     
     def _cleanup_temp_files(self):
         """

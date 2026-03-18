@@ -50,19 +50,18 @@ class InvestmentCrew:
         >>> print(result)
     """
 
-    def __init__(self, use_mock: bool = False):
+    def __init__(self):
         """
         初始化投资分析 Crew
-
-        Args:
-            use_mock: 是否使用 Mock Agent（默认 False，使用真实 Agent）
+        
+        所有 Agent 使用真实数据分析，不使用 mock 数据。
         """
         # 初始化 6 个 Agent
-        self._init_agents(use_mock)
+        self._init_agents()
         
         logger.info("投资分析 Crew 初始化完成（6 Agent）")
 
-    def _init_agents(self, use_mock: bool):
+    def _init_agents(self):
         """初始化所有 Agent"""
         
         # 1. 量化分析师（真实）

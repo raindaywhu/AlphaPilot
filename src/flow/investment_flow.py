@@ -40,14 +40,12 @@ class InvestmentAnalysisFlow:
     1. 数据准备 → 2. 并行分析 → 3. 风险评估 → 4. 综合决策 → 5. 生成报告
     """
     
-    def __init__(self, use_mock: bool = False):
+    def __init__(self):
         """
         初始化工作流
         
-        Args:
-            use_mock: 是否使用模拟数据
+        所有 Agent 使用真实数据分析，不使用 mock 数据。
         """
-        self.use_mock = use_mock
         
         # 初始化 Agent
         self.quant_analyst = QuantitativeAnalyst()
@@ -279,7 +277,7 @@ class InvestmentAnalysisFlow:
 
 # 测试代码
 if __name__ == "__main__":
-    flow = InvestmentAnalysisFlow(use_mock=True)
+    flow = InvestmentAnalysisFlow()
     result = flow.run("sh600519")
     
     import json

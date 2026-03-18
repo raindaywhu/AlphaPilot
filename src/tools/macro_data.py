@@ -1,7 +1,7 @@
 """
 宏观经济数据工具
 
-获取宏观经济指标数据
+获取宏观经济指标数据 - 使用 akshare 真实 API
 
 Issue: #35 (TOOL-补齐)
 """
@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from typing import Dict, Any, List
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ class MacroDataTool:
     """
     宏观经济数据工具
     
-    提供主要宏观经济指标:
+    提供主要宏观经济指标 (使用 akshare 真实 API):
     - GDP 增长率
     - CPI/PPI 通胀指标
     - PMI 制造业指数
@@ -32,59 +33,116 @@ class MacroDataTool:
         """初始化工具"""
         self.name = "MacroDataTool"
         self.description = "宏观经济数据获取工具"
-        
-        # 模拟的宏观指标数据
-        self.mock_data = {
-            "gdp_growth": {
-                "value": 5.0,
-                "unit": "%",
-                "period": "2025Q4",
-                "yoy_change": 0.3,
-                "description": "GDP增速保持稳定，经济运行在合理区间"
-            },
-            "cpi": {
-                "value": 0.2,
-                "unit": "%",
-                "period": "2026年2月",
-                "yoy_change": 0.1,
-                "description": "CPI温和上涨，通胀压力较小"
-            },
-            "ppi": {
-                "value": -2.0,
-                "unit": "%",
-                "period": "2026年2月",
-                "yoy_change": -0.5,
-                "description": "PPI持续负增长，工业品价格下行压力"
-            },
-            "pmi": {
-                "value": 50.2,
-                "unit": "",
-                "period": "2026年2月",
-                "yoy_change": 0.5,
-                "description": "PMI位于荣枯线之上，制造业扩张"
-            },
-            "interest_rate": {
-                "value": 3.1,
-                "unit": "%",
-                "period": "当前",
-                "yoy_change": -0.2,
-                "description": "LPR利率，货币政策保持宽松"
-            },
-            "exchange_rate": {
-                "value": 7.2,
-                "unit": "USD/CNY",
-                "period": "当前",
-                "yoy_change": 0.1,
-                "description": "人民币汇率保持稳定"
-            },
-            "social_financing": {
-                "value": 350,
-                "unit": "万亿",
-                "period": "2025年末",
-                "yoy_change": 8.0,
-                "description": "社融规模持续增长，信用环境宽松"
-            }
-        }
+        self._akshare = None
+    
+    def _get_akshare(self):
+        """延迟导入 akshare"""
+        if self._akshare is None:
+            try:
+                import akshare as ak
+                self._akshare = ak
+            except ImportError:
+                raise ImportError("请安装 akshare: pip install akshare")
+        return self._akshare
+    
+    def _fetch_gdp(self) -> Dict[str, Any]:
+        """获取 GDP 数据"""
+        ak = self._get_akshare()
+        try:
+            df = ak.macro_china_gdp()
+            if df is not None and len(df) > 0:
+                latest = df.iloc[-1]
+                prev = df.iloc[-2] if len(df) > 1 else latest
+                
+                return {
+                    "value": float(latest.get("国内生产总值-同比增长", 0)),
+                    "unit": "%",
+                    "period": str(latest.get("季度", "")),
+                    "yoy_change": float(latest.get("国内生产总值-同比增长", 0)) - float(prev.get("国内生产总值-同比增长", 0)),
+                    "description": f"GDP增速{latest.get('国内生产总值-同比增长', 0)}%"
+                }
+        except Exception as e:
+            logger.error(f"获取 GDP 数据失败: {e}")
+        return {"error": f"获取 GDP 数据失败"}
+    
+    def _fetch_cpi(self) -> Dict[str, Any]:
+        """获取 CPI 数据"""
+        ak = self._get_akshare()
+        try:
+            df = ak.macro_china_cpi_yearly()
+            if df is not None and len(df) > 0:
+                latest = df.iloc[-1]
+                prev = df.iloc[-2] if len(df) > 1 else latest
+                
+                return {
+                    "value": float(latest.get("今值", 0) if "今值" in latest else 0),
+                    "unit": "%",
+                    "period": str(latest.get("日期", "")),
+                    "yoy_change": float(latest.get("今值", 0) if "今值" in latest else 0) - float(prev.get("今值", 0) if "今值" in prev else 0),
+                    "description": f"CPI同比{latest.get('今值', 0)}%"
+                }
+        except Exception as e:
+            logger.error(f"获取 CPI 数据失败: {e}")
+        return {"error": f"获取 CPI 数据失败"}
+    
+    def _fetch_pmi(self) -> Dict[str, Any]:
+        """获取 PMI 数据"""
+        ak = self._get_akshare()
+        try:
+            df = ak.macro_china_pmi_yearly()
+            if df is not None and len(df) > 0:
+                latest = df.iloc[-1]
+                prev = df.iloc[-2] if len(df) > 1 else latest
+                
+                return {
+                    "value": float(latest.get("今值", 0) if "今值" in latest else 0),
+                    "unit": "",
+                    "period": str(latest.get("日期", "")),
+                    "yoy_change": float(latest.get("今值", 0) if "今值" in latest else 0) - float(prev.get("今值", 0) if "今值" in prev else 0),
+                    "description": f"PMI指数{latest.get('今值', 0)}"
+                }
+        except Exception as e:
+            logger.error(f"获取 PMI 数据失败: {e}")
+        return {"error": f"获取 PMI 数据失败"}
+    
+    def _fetch_interest_rate(self) -> Dict[str, Any]:
+        """获取利率数据"""
+        ak = self._get_akshare()
+        try:
+            # 获取 LPR 数据
+            df = ak.rate_interbank(market="LPR银行同业拆借市场", symbol="LPR1年")
+            if df is not None and len(df) > 0:
+                latest = df.iloc[-1]
+                
+                return {
+                    "value": float(latest.get("利率", 0) if "利率" in latest else 3.1),
+                    "unit": "%",
+                    "period": str(latest.get("日期", "")),
+                    "yoy_change": 0,
+                    "description": "LPR 1年期利率"
+                }
+        except Exception as e:
+            logger.error(f"获取利率数据失败: {e}")
+        return {"error": f"获取利率数据失败"}
+    
+    def _fetch_exchange_rate(self) -> Dict[str, Any]:
+        """获取汇率数据"""
+        ak = self._get_akshare()
+        try:
+            df = ak.fx_spot_quote()
+            if df is not None and len(df) > 0:
+                usd_cny = df[df["货币对"] == "USD/CNY"]
+                if len(usd_cny) > 0:
+                    return {
+                        "value": float(usd_cny.iloc[0].get("买报价", 7.2)),
+                        "unit": "USD/CNY",
+                        "period": datetime.now().strftime("%Y-%m-%d"),
+                        "yoy_change": 0,
+                        "description": "人民币兑美元汇率"
+                    }
+        except Exception as e:
+            logger.error(f"获取汇率数据失败: {e}")
+        return {"error": f"获取汇率数据失败"}
     
     def run(self, indicators: List[str] = None) -> Dict[str, Any]:
         """
@@ -92,23 +150,41 @@ class MacroDataTool:
         
         Args:
             indicators: 指标列表，默认获取全部
+                - gdp_growth: GDP增长率
+                - cpi: 消费者物价指数
+                - ppi: 生产者物价指数
+                - pmi: 制造业采购经理指数
+                - interest_rate: 利率
+                - exchange_rate: 汇率
         
         Returns:
             宏观数据字典
         """
         logger.info(f"获取宏观数据: {indicators or '全部'}")
         
+        # 所有支持的指标
+        all_indicators = {
+            "gdp_growth": self._fetch_gdp,
+            "cpi": self._fetch_cpi,
+            "pmi": self._fetch_pmi,
+            "interest_rate": self._fetch_interest_rate,
+            "exchange_rate": self._fetch_exchange_rate,
+        }
+        
         if indicators is None:
-            indicators = list(self.mock_data.keys())
+            indicators = list(all_indicators.keys())
         
         result = {
-            "fetch_time": "2026-03-18",
+            "fetch_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "indicators": {}
         }
         
         for indicator in indicators:
-            if indicator in self.mock_data:
-                result["indicators"][indicator] = self.mock_data[indicator]
+            if indicator in all_indicators:
+                try:
+                    result["indicators"][indicator] = all_indicators[indicator]()
+                except Exception as e:
+                    result["indicators"][indicator] = {"error": f"获取失败: {str(e)}"}
             else:
                 result["indicators"][indicator] = {"error": "指标不存在"}
         
@@ -127,14 +203,15 @@ class MacroDataTool:
         Returns:
             指标数据
         """
-        return self.mock_data.get(indicator, {"error": "指标不存在"})
+        result = self.run([indicator])
+        return result["indicators"].get(indicator, {"error": "指标不存在"})
     
     def _analyze_macro(self, indicators: Dict) -> Dict[str, Any]:
         """分析宏观经济状况"""
         signals = []
         
         # GDP 分析
-        if "gdp_growth" in indicators:
+        if "gdp_growth" in indicators and "error" not in indicators["gdp_growth"]:
             gdp = indicators["gdp_growth"].get("value", 0)
             if gdp >= 5.0:
                 signals.append("经济增速稳健")
@@ -144,7 +221,7 @@ class MacroDataTool:
                 signals.append("经济增速放缓")
         
         # CPI 分析
-        if "cpi" in indicators:
+        if "cpi" in indicators and "error" not in indicators["cpi"]:
             cpi = indicators["cpi"].get("value", 0)
             if cpi > 3.0:
                 signals.append("通胀压力较大")
@@ -154,7 +231,7 @@ class MacroDataTool:
                 signals.append("通胀温和")
         
         # PMI 分析
-        if "pmi" in indicators:
+        if "pmi" in indicators and "error" not in indicators["pmi"]:
             pmi = indicators["pmi"].get("value", 0)
             if pmi >= 52:
                 signals.append("制造业景气度较高")
@@ -164,7 +241,7 @@ class MacroDataTool:
                 signals.append("制造业收缩")
         
         # 利率分析
-        if "interest_rate" in indicators:
+        if "interest_rate" in indicators and "error" not in indicators["interest_rate"]:
             rate = indicators["interest_rate"].get("value", 0)
             yoy = indicators["interest_rate"].get("yoy_change", 0)
             if yoy < 0:
@@ -213,21 +290,18 @@ class MacroDataTool:
         # 行业影响分析
         if stock_industry:
             if stock_industry in ["白酒", "消费"]:
-                # 消费行业受 CPI 和收入影响
                 impact["industry_impact"] = {
                     "sensitive_to": ["cpi", "gdp_growth"],
                     "analysis": "消费行业受益于温和通胀和经济增长",
                     "recommendation": "中性偏乐观"
                 }
             elif stock_industry in ["银行", "保险"]:
-                # 金融行业受利率影响
                 impact["industry_impact"] = {
                     "sensitive_to": ["interest_rate", "social_financing"],
                     "analysis": "金融行业受利率下行影响，息差收窄",
                     "recommendation": "中性偏谨慎"
                 }
             elif stock_industry in ["制造业", "工业"]:
-                # 制造业受 PMI 和 PPI 影响
                 impact["industry_impact"] = {
                     "sensitive_to": ["pmi", "ppi"],
                     "analysis": "制造业受PPI下行影响，盈利承压",

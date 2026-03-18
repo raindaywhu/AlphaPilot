@@ -24,11 +24,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from src.flow.investment_flow import InvestmentAnalysisFlow
-<<<<<<< HEAD
 from src.tools.stock_name_query_tool import StockNameQueryTool
-=======
-from src.tools.stock_name_query_tool import StockNameQueryTool
->>>>>>> b020bdf (feat: Web UI 支持股票名称输入 (#38))
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -63,11 +59,7 @@ stock_name_tool = StockNameQueryTool()
 
 class AnalyzeRequest(BaseModel):
     """股票分析请求"""
-<<<<<<< HEAD
     stock_code: str = Field(..., description="股票代码或名称，如 SH600519 或 贵州茅台", example="贵州茅台")
-=======
-    stock_code: str = Field(..., description="股票代码或名称，如 SH600519 或 贵州茅台", example="SH600519")
->>>>>>> b020bdf (feat: Web UI 支持股票名称输入 (#38))
     parallel: bool = Field(True, description="是否并行分析")
     time_horizon: int = Field(5, description="预测周期（天）", ge=1, le=30)
 
@@ -208,11 +200,7 @@ async def analyze_stock(request: AnalyzeRequest):
     
     执行量化、基本面、宏观、另类、风控五维分析
     
-<<<<<<< HEAD
-    - **stock_code**: 股票代码或名称，如 SH600519 或 贵州茅台
-=======
     - **stock_code**: 股票代码或名称，如 SH600519、贵州茅台、茅台
->>>>>>> b020bdf (feat: Web UI 支持股票名称输入 (#38))
     - **parallel**: 是否并行分析（默认 True）
     - **time_horizon**: 预测周期（天）
     """
@@ -245,7 +233,7 @@ async def analyze_stock(request: AnalyzeRequest):
                 )
         
         # 初始化 Flow（使用工作流编排）
-        flow = InvestmentAnalysisFlow(use_mock=False)
+        flow = InvestmentAnalysisFlow()
         
         # 执行分析
         result = flow.run(
