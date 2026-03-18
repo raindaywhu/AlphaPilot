@@ -1,13 +1,9 @@
 """
-AlphaPilot Bot - 飞书机器人模块
+飞书机器人模块
 
-提供飞书机器人功能，支持股票分析命令
-
-Issue: #21 (UI-001)
+UI-001: 飞书机器人开发
 """
 
-from .bot import AlphaPilotBot
-from .handlers import CommandHandler
-from .cards import CardBuilder
+from .feishu_bot import FeishuBot
 
-__all__ = ["AlphaPilotBot", "CommandHandler", "CardBuilder"]
+__all__ = ["FeishuBot"]
