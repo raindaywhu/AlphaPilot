@@ -10,7 +10,7 @@ Issue: #12 (AGENT-001)
 import os
 import json
 import logging
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 
 # 设置环境变量以绕过 CrewAI 的 OPENAI_API_KEY 检查
@@ -24,6 +24,7 @@ from langchain_openai import ChatOpenAI
 from ..tools.alpha158_tool import Alpha158Tool
 from ..tools.mootdx_tool import MootdxTool
 from ..tools.technical_indicators_tool import TechnicalIndicatorsTool
+from ..tools.qlib_data_tool import QlibDataTool  # 新增：qlib 数据工具
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -68,8 +69,9 @@ class QuantitativeAnalyst:
 
         # 初始化工具
         self.alpha158_tool = Alpha158Tool()
-        self.mootdx_tool = MootdxTool()  # 全 A 股数据工具
+        self.mootdx_tool = MootdxTool()  # 全 A 股数据工具（回退）
         self.tech_tool = TechnicalIndicatorsTool()
+        self.qlib_tool = QlibDataTool()  # qlib 数据工具（主要）
 
         # 创建 CrewAI Agent
         self.agent = self._create_agent()
@@ -152,8 +154,7 @@ class QuantitativeAnalyst:
         self,
         stock_code: str,
         analysis_type: str = "技术面分析",
-        time_horizon: int = 5,
-        use_qlib: bool = True
+        time_horizon: int = 5
     ) -> Dict[str, Any]:
         """
         分析股票技术面
@@ -162,253 +163,78 @@ class QuantitativeAnalyst:
             stock_code: 股票代码，如 'SH600519'
             analysis_type: 分析类型，如 '技术面分析', '趋势判断', '买卖点识别'
             time_horizon: 预测周期（天）
-            use_qlib: 是否使用 qlib 数据层（默认 True，符合设计要求）
 
         Returns:
             分析结果字典
         """
         logger.info(f"开始分析股票: {stock_code}")
 
-        # ========== 数据流修复 (Issue #33) ==========
-        # 设计要求: Agent 应使用 qlib 数据层，而非直接调用 MootdxTool
-        # 数据流: mootdx → qlib_updater → qlib数据 → Agent
-        # ==============================================================
-
-        if use_qlib:
-            # 优先使用 qlib 工具（Alpha158 + GBDT）
-            qlib_result = self._analyze_with_qlib(stock_code, time_horizon)
-            if qlib_result:
-                return qlib_result
-            else:
-                logger.warning("qlib 分析失败，尝试使用技术指标工具...")
-
-        # 回退到技术指标工具（仍然使用 qlib 数据）
+        # 数据流架构：qlib → QlibDataTool → Agent
+        # 优先使用 QlibDataTool（符合设计文档的数据流）
         try:
-            tech_indicators = self.tech_tool.get_indicators(stock_code)
-            if tech_indicators and 'error' not in tech_indicators:
-                logger.info(f"成功获取股票 {stock_code} 的技术指标数据（qlib 数据层）")
-                return self._build_result_from_tech_indicators(
-                    stock_code, analysis_type, time_horizon, tech_indicators
-                )
+            logger.info(f"使用 QlibDataTool 获取数据...")
+            kline_data = self.qlib_tool.get_kline_data(stock_code, days=100)
+            
+            if kline_data is not None and len(kline_data) > 0:
+                logger.info(f"QlibDataTool 获取成功: {len(kline_data)} 条数据")
+                
+                # 计算技术指标
+                kline_data = self.qlib_tool.calculate_technical_indicators(kline_data)
+                
+                # 构建分析结果
+                result = self._build_qlib_analysis_result(stock_code, kline_data, analysis_type, time_horizon)
+                
+                logger.info(f"分析完成: {stock_code}")
+                return result
+                
         except Exception as e:
-            logger.warning(f"技术指标工具分析失败: {e}")
+            logger.warning(f"QlibDataTool 分析失败: {e}，尝试使用 MootdxTool...")
 
-        # 最后回退到 MootdxTool（临时方案，仅用于数据未更新时）
-        logger.warning("⚠️ 使用 MootdxTool 作为临时回退 - 数据流不符合设计要求")
-        logger.warning("请运行 qlib_updater 更新 qlib 数据: python -m src.data.qlib_updater update")
+        # 回退到 MootdxTool（支持全 A 股）
         try:
+            logger.info(f"使用 MootdxTool 获取数据...")
             mootdx_result = self.mootdx_tool.analyze(stock_code)
+            
             if mootdx_result.get('success'):
-                return self._build_result_from_mootdx(
-                    stock_code, analysis_type, time_horizon, mootdx_result
-                )
-        except Exception as e:
-            logger.error(f"MootdxTool 分析也失败: {e}")
-
-        # 所有方法都失败
-        return {
-            "agent": "quant_analyst",
-            "stock_code": stock_code,
-            "analysis_date": datetime.now().strftime("%Y-%m-%d"),
-            "analysis_type": analysis_type,
-            "time_horizon": time_horizon,
-            "data_validation": {"status": "failed", "warnings": ["无法获取数据"]},
-            "overall_rating": "无法分析",
-            "confidence": 0.0,
-            "factor_analysis": {},
-            "signals": [],
-            "risk_warning": ["数据获取失败，无法完成分析"],
-            "conclusion": "数据不足，无法完成分析"
-        }
-
-    def _analyze_with_qlib(
-        self,
-        stock_code: str,
-        time_horizon: int
-    ) -> Optional[Dict[str, Any]]:
-        """
-        使用 qlib 工具进行分析（符合设计要求的数据流）
-
-        Args:
-            stock_code: 股票代码
-            time_horizon: 预测周期
-
-        Returns:
-            分析结果字典，失败返回 None
-        """
-        try:
-            from ..tools.gbdt_tool import QlibGBDTPredictionTool
-            gbdt_tool = QlibGBDTPredictionTool()
-
-            # 使用 GBDT 进行预测
-            logger.info(f"使用 qlib GBDT 工具分析 {stock_code}...")
-            gbdt_result = gbdt_tool.predict(stock_code, horizon=time_horizon)
-
-            if gbdt_result.get('status') == 'success':
-                prediction = gbdt_result.get('prediction', 0)
-                confidence = gbdt_result.get('confidence', 0.5)
-
-                # 基于预测结果构建评级
-                if prediction > 0.02:
-                    rating = "看涨"
-                elif prediction < -0.02:
-                    rating = "看跌"
-                else:
-                    rating = "中性"
-
-                # 尝试获取 Alpha158 因子数据
-                factor_analysis = {}
-                try:
-                    alpha_df = self.alpha158_tool.get_stock_factors(stock_code)
-                    if alpha_df is not None and len(alpha_df) > 0:
-                        latest_factors = alpha_df.iloc[-1]
-                        factor_analysis = {
-                            "alpha158_available": True,
-                            "factor_count": len(latest_factors),
-                            "sample_factors": {
-                                k: float(v) for k, v in list(latest_factors.items())[:10]
-                            }
-                        }
-                except Exception as e:
-                    logger.warning(f"获取 Alpha158 因子失败: {e}")
-                    factor_analysis = {"alpha158_available": False}
-
+                logger.info(f"MootdxTool 分析成功")
+                
+                # 构建 MootdxTool 的分析结果
                 result = {
                     "agent": "quant_analyst",
                     "stock_code": stock_code,
                     "analysis_date": datetime.now().strftime("%Y-%m-%d"),
-                    "analysis_type": "技术面分析",
+                    "analysis_type": analysis_type,
                     "time_horizon": time_horizon,
                     "data_validation": {
                         "status": "valid",
-                        "data_source": "qlib",
-                        "warnings": []
+                        "latest_data_date": mootdx_result.get('latest_date'),
+                        "data_points": mootdx_result.get('data_points'),
+                        "warnings": ["使用 MootdxTool（回退方案）"]
                     },
-                    "overall_rating": rating,
-                    "confidence": confidence,
-                    "factor_analysis": factor_analysis,
-                    "prediction": {
-                        "model": "GBDT",
-                        "value": prediction,
-                        "horizon": time_horizon
+                    "overall_rating": mootdx_result.get('rating', '中性'),
+                    "confidence": mootdx_result.get('score', 50) / 100.0,
+                    "factor_analysis": {
+                        "technical_indicators": mootdx_result.get('indicators', {}),
+                        "trend": mootdx_result.get('analysis', {}).get('trend', {}),
+                        "macd": mootdx_result.get('analysis', {}).get('macd_signal', {}),
+                        "rsi": mootdx_result.get('analysis', {}).get('rsi_signal', {}),
+                        "kdj": mootdx_result.get('analysis', {}).get('kdj_signal', {})
                     },
-                    "signals": [{
-                        "indicator": "GBDT预测",
-                        "signal": rating,
-                        "strength": "中" if confidence > 0.3 else "弱",
-                        "description": f"预测 {time_horizon} 日涨跌幅: {prediction:.2%}"
-                    }],
+                    "signals": self._extract_signals(mootdx_result),
                     "risk_warning": [
-                        "预测基于历史数据，不保证未来表现",
-                        "建议结合基本面和宏观分析"
+                        "MootdxTool 基于技术指标分析",
+                        "建议结合基本面分析"
                     ],
-                    "conclusion": f"GBDT 预测 {time_horizon} 日涨跌幅 {prediction:.2%}，{rating}"
+                    "conclusion": self._build_conclusion(mootdx_result)
                 }
-
-                logger.info(f"qlib 分析完成: {stock_code}")
+                
+                logger.info(f"分析完成: {stock_code}")
                 return result
-
+                
         except Exception as e:
-            logger.warning(f"qlib 分析失败: {e}")
-            return None
+            logger.warning(f"MootdxTool 分析失败: {e}，尝试使用 Alpha158Tool...")
 
-    def _build_result_from_tech_indicators(
-        self,
-        stock_code: str,
-        analysis_type: str,
-        time_horizon: int,
-        tech_indicators: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        从技术指标构建分析结果
-
-        Args:
-            stock_code: 股票代码
-            analysis_type: 分析类型
-            time_horizon: 预测周期
-            tech_indicators: 技术指标数据
-
-        Returns:
-            分析结果字典
-        """
-        # 分析技术指标
-        factor_analysis = self._analyze_indicators(tech_indicators)
-        signals = self._generate_signals_from_indicators(tech_indicators)
-        overall_rating, confidence = self._calculate_rating_from_indicators(
-            factor_analysis, signals
-        )
-        conclusion = self._generate_conclusion(overall_rating, factor_analysis, signals)
-
-        result = {
-            "agent": "quant_analyst",
-            "stock_code": stock_code,
-            "analysis_date": datetime.now().strftime("%Y-%m-%d"),
-            "analysis_type": analysis_type,
-            "time_horizon": time_horizon,
-            "data_validation": {
-                "status": "valid",
-                "data_source": "qlib",
-                "warnings": []
-            },
-            "overall_rating": overall_rating,
-            "confidence": confidence,
-            "factor_analysis": factor_analysis,
-            "signals": signals,
-            "risk_warning": [
-                "技术指标仅供参考，不构成投资建议",
-                "建议结合基本面分析"
-            ],
-            "conclusion": conclusion,
-            "price": tech_indicators.get("price", {})
-        }
-
-        logger.info(f"技术指标分析完成: {stock_code}")
-        return result
-
-    def _build_result_from_mootdx(
-        self,
-        stock_code: str,
-        analysis_type: str,
-        time_horizon: int,
-        mootdx_result: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        从 MootdxTool 结果构建分析结果（临时回退方案）
-
-        ⚠️ 注意: 这不符合设计要求的数据流，仅作为数据未更新时的临时方案
-        """
-        return {
-            "agent": "quant_analyst",
-            "stock_code": stock_code,
-            "analysis_date": datetime.now().strftime("%Y-%m-%d"),
-            "analysis_type": analysis_type,
-            "time_horizon": time_horizon,
-            "data_validation": {
-                "status": "valid",
-                "data_source": "mootdx_direct",  # 标注数据来源
-                "latest_data_date": mootdx_result.get('latest_date'),
-                "warnings": ["⚠️ 绕过 qlib 数据层，不符合设计要求"]
-            },
-            "overall_rating": mootdx_result.get('rating', '中性'),
-            "confidence": mootdx_result.get('score', 50) / 100.0,
-            "factor_analysis": {
-                "technical_indicators": mootdx_result.get('indicators', {}),
-                "trend": mootdx_result.get('analysis', {}).get('trend', {}),
-                "macd": mootdx_result.get('analysis', {}).get('macd_signal', {}),
-                "rsi": mootdx_result.get('analysis', {}).get('rsi_signal', {}),
-                "kdj": mootdx_result.get('analysis', {}).get('kdj_signal', {})
-            },
-            "signals": self._extract_signals(mootdx_result),
-            "risk_warning": [
-                "⚠️ 数据绕过 qlib 层，数据流不符合设计",
-                "建议运行 qlib_updater 更新数据",
-                "技术指标分析仅供参考"
-            ],
-            "conclusion": self._build_conclusion(mootdx_result)
-        }
-
-        # 回退到 Alpha158Tool（仅支持 csi300）
-        # 获取 Alpha158 因子数据
+        # 最后回退到 Alpha158Tool（仅支持 csi300）
         # 获取技术指标数据
         try:
             tech_indicators = self.tech_tool.get_indicators(stock_code)
@@ -466,6 +292,127 @@ class QuantitativeAnalyst:
 
         logger.info(f"分析完成: {stock_code}")
         return result
+    
+    def _build_qlib_analysis_result(
+        self,
+        stock_code: str,
+        kline_data: pd.DataFrame,
+        analysis_type: str,
+        time_horizon: int
+    ) -> Dict[str, Any]:
+        """
+        构建 QlibDataTool 分析结果
+        
+        Args:
+            stock_code: 股票代码
+            kline_data: K线数据（已计算技术指标）
+            analysis_type: 分析类型
+            time_horizon: 预测周期
+        
+        Returns:
+            分析结果字典
+        """
+        # 获取最新数据
+        latest = kline_data.iloc[-1]
+        previous = kline_data.iloc[-2] if len(kline_data) > 1 else latest
+        
+        # 计算 MA 趋势
+        ma_trend = "中性"
+        if 'MA5' in latest and 'MA10' in latest and 'MA20' in latest:
+            if latest['MA5'] > latest['MA10'] > latest['MA20']:
+                ma_trend = "多头排列"
+            elif latest['MA5'] < latest['MA10'] < latest['MA20']:
+                ma_trend = "空头排列"
+        
+        # MACD 信号
+        macd_signal = "中性"
+        if 'MACD' in latest and 'MACD_Signal' in latest:
+            if latest['MACD'] > latest['MACD_Signal'] and previous['MACD'] <= previous['MACD_Signal']:
+                macd_signal = "金叉"
+            elif latest['MACD'] < latest['MACD_Signal'] and previous['MACD'] >= previous['MACD_Signal']:
+                macd_signal = "死叉"
+        
+        # RSI 信号
+        rsi_signal = "正常"
+        if 'RSI' in latest:
+            if latest['RSI'] > 70:
+                rsi_signal = "超买"
+            elif latest['RSI'] < 30:
+                rsi_signal = "超卖"
+        
+        # 计算综合评分
+        score = 50
+        signals = []
+        
+        # MA 信号
+        if ma_trend == "多头排列":
+            score += 15
+            signals.append({"indicator": "MA", "signal": "多头排列", "strength": "强"})
+        elif ma_trend == "空头排列":
+            score -= 15
+            signals.append({"indicator": "MA", "signal": "空头排列", "strength": "强"})
+        
+        # MACD 信号
+        if macd_signal == "金叉":
+            score += 10
+            signals.append({"indicator": "MACD", "signal": "金叉", "strength": "强"})
+        elif macd_signal == "死叉":
+            score -= 10
+            signals.append({"indicator": "MACD", "signal": "死叉", "strength": "强"})
+        
+        # RSI 信号
+        if rsi_signal == "超卖":
+            score += 10
+            signals.append({"indicator": "RSI", "signal": "超卖", "strength": "中"})
+        elif rsi_signal == "超买":
+            score -= 10
+            signals.append({"indicator": "RSI", "signal": "超买", "strength": "中"})
+        
+        # 确定评级
+        if score > 60:
+            rating = "看涨"
+        elif score < 40:
+            rating = "看跌"
+        else:
+            rating = "中性"
+        
+        confidence = abs(score - 50) / 100.0
+        
+        return {
+            "agent": "quant_analyst",
+            "stock_code": stock_code,
+            "analysis_date": datetime.now().strftime("%Y-%m-%d"),
+            "analysis_type": analysis_type,
+            "time_horizon": time_horizon,
+            "data_validation": {
+                "status": "valid",
+                "latest_data_date": latest['datetime'].strftime("%Y-%m-%d") if hasattr(latest['datetime'], 'strftime') else str(latest['datetime']),
+                "data_points": len(kline_data),
+                "warnings": []
+            },
+            "overall_rating": rating,
+            "confidence": confidence,
+            "factor_analysis": {
+                "technical_indicators": {
+                    "close": float(latest['close']),
+                    "MA5": float(latest.get('MA5', 0)),
+                    "MA10": float(latest.get('MA10', 0)),
+                    "MA20": float(latest.get('MA20', 0)),
+                    "RSI": float(latest.get('RSI', 50)),
+                    "MACD": float(latest.get('MACD', 0)),
+                    "MACD_Signal": float(latest.get('MACD_Signal', 0))
+                },
+                "trend": {"ma_trend": ma_trend},
+                "macd": {"signal": macd_signal},
+                "rsi": {"signal": rsi_signal}
+            },
+            "signals": signals,
+            "risk_warning": [
+                "QlibDataTool 基于技术指标分析",
+                "建议结合基本面分析"
+            ],
+            "conclusion": f"技术面{rating}，均线{ma_trend}，MACD{macd_signal}，RSI{rsi_signal}，综合评分{score}分"
+        }
 
     def _analyze_factors(self, factors_df) -> Dict[str, Any]:
         """
