@@ -11,6 +11,9 @@ from .commodity_price_tool import CommodityPriceTool
 from .qlib_data_tool import QlibDataTool
 from .valuation_calculator import ValuationCalculatorTool
 from .web_search import WebSearchTool
+from .industry_compare import IndustryCompareTool
+from .sentiment_analysis import SentimentAnalysisTool
+from .macro_data import MacroDataTool
 
 __all__ = [
     'Alpha158Tool',
@@ -19,5 +22,8 @@ __all__ = [
     'CommodityPriceTool',
     'QlibDataTool',
     'ValuationCalculatorTool',
-    'WebSearchTool'
+    'WebSearchTool',
+    'IndustryCompareTool',
+    'SentimentAnalysisTool',
+    'MacroDataTool'
 ]
