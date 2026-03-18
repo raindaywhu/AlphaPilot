@@ -23,6 +23,7 @@ from langchain_openai import ChatOpenAI
 # 导入工具
 from ..tools.alpha158_tool import Alpha158Tool
 from ..tools.mootdx_tool import MootdxTool
+from ..tools.technical_indicators_tool import TechnicalIndicatorsTool
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -66,8 +67,12 @@ class QuantitativeAnalyst:
         )
 
         # 初始化工具
+<<<<<<< HEAD
         self.alpha158_tool = Alpha158Tool()
         self.mootdx_tool = MootdxTool()  # 新增：全 A 股数据工具
+=======
+        self.tech_tool = TechnicalIndicatorsTool()
+>>>>>>> 8464d64a27bd45649e7ad53037c1a2f5e816a754
 
         # 创建 CrewAI Agent
         self.agent = self._create_agent()
@@ -165,6 +170,7 @@ class QuantitativeAnalyst:
         """
         logger.info(f"开始分析股票: {stock_code}")
 
+<<<<<<< HEAD
         # 优先使用 MootdxTool（支持全 A 股）
         try:
             logger.info(f"使用 MootdxTool 获取数据...")
@@ -211,28 +217,15 @@ class QuantitativeAnalyst:
 
         # 回退到 Alpha158Tool（仅支持 csi300）
         # 获取 Alpha158 因子数据
+=======
+        # 获取技术指标数据
+>>>>>>> 8464d64a27bd45649e7ad53037c1a2f5e816a754
         try:
-            # 使用最近3个月的数据
-            end_date = datetime.now().strftime("%Y-%m-%d")
-            start_date = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
-
-            factors_df = self.alpha158_tool.get_factors(
-                instruments='csi300',
-                start_time=start_date,
-                end_time=end_date
-            )
-
-            # 筛选目标股票
-            if stock_code in factors_df.index.get_level_values('instrument'):
-                stock_factors = factors_df.xs(stock_code, level='instrument')
-                logger.info(f"成功获取股票 {stock_code} 的因子数据")
-            else:
-                logger.warning(f"股票 {stock_code} 不在数据中")
-                stock_factors = None
-
+            tech_indicators = self.tech_tool.get_indicators(stock_code)
+            logger.info(f"成功获取股票 {stock_code} 的技术指标数据")
         except Exception as e:
-            logger.error(f"获取因子数据失败: {e}")
-            stock_factors = None
+            logger.error(f"获取技术指标失败: {e}")
+            tech_indicators = None
 
         # 构建分析结果
         result = {
@@ -242,8 +235,8 @@ class QuantitativeAnalyst:
             "analysis_type": analysis_type,
             "time_horizon": time_horizon,
             "data_validation": {
-                "status": "valid" if stock_factors is not None else "missing",
-                "latest_data_date": end_date,
+                "status": "valid" if tech_indicators and 'error' not in tech_indicators else "missing",
+                "latest_data_date": datetime.now().strftime("%Y-%m-%d"),
                 "warnings": []
             },
             "overall_rating": "待分析",
@@ -254,29 +247,31 @@ class QuantitativeAnalyst:
             "conclusion": "数据不足，无法完成分析"
         }
 
-        # 如果有因子数据，进行分析
-        if stock_factors is not None:
-            # 分析因子
-            factor_analysis = self._analyze_factors(stock_factors)
+        # 如果有技术指标数据，进行分析
+        if tech_indicators and 'error' not in tech_indicators:
+            # 分析技术指标
+            factor_analysis = self._analyze_indicators(tech_indicators)
             result["factor_analysis"] = factor_analysis
 
             # 生成信号
-            signals = self._generate_signals(stock_factors)
+            signals = self._generate_signals_from_indicators(tech_indicators)
             result["signals"] = signals
 
             # 计算综合评分
-            overall_rating, confidence = self._calculate_rating(factor_analysis, signals)
+            overall_rating, confidence = self._calculate_rating_from_indicators(factor_analysis, signals)
             result["overall_rating"] = overall_rating
             result["confidence"] = confidence
 
             # 生成结论
             result["conclusion"] = self._generate_conclusion(overall_rating, factor_analysis, signals)
 
+            # 添加价格信息
+            result["price"] = tech_indicators.get("price", {})
+            
             # 风险提示
             result["risk_warning"] = [
-                "qlib 数据可能过期（截止 2020-09-25）",
-                "GBDT 模型尚未训练",
-                "技术指标工具尚未实现"
+                "技术指标仅供参考，不构成投资建议",
+                "请注意市场风险"
             ]
 
         logger.info(f"分析完成: {stock_code}")
@@ -602,6 +597,256 @@ class QuantitativeAnalyst:
         parts.append(f"综合评分{score}分")
         
         return "，".join(parts)
+
+    def _analyze_indicators(self, tech_indicators: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        分析技术指标
+        
+        Args:
+            tech_indicators: 技术指标字典
+            
+        Returns:
+            技术指标分析结果
+        """
+        result = {}
+        
+        # MA 分析
+        ma = tech_indicators.get("ma", {})
+        if ma:
+            ma5 = ma.get("MA5", 0)
+            ma10 = ma.get("MA10", 0)
+            ma20 = ma.get("MA20", 0)
+            ma60 = ma.get("MA60", 0)
+            
+            # 判断均线排列
+            if ma5 > ma10 > ma20 > ma60:
+                ma_trend = "多头排列"
+                ma_score = 0.8
+            elif ma5 < ma10 < ma20 < ma60:
+                ma_trend = "空头排列"
+                ma_score = 0.2
+            else:
+                ma_trend = "交织"
+                ma_score = 0.5
+            
+            result["moving_average"] = {
+                "score": ma_score,
+                "rating": ma_trend,
+                "values": ma
+            }
+        
+        # MACD 分析
+        macd = tech_indicators.get("macd", {})
+        if macd:
+            macd_val = macd.get("MACD")
+            histogram = macd.get("Histogram")
+            trend = macd.get("Trend", "中性")
+            
+            result["macd"] = {
+                "score": 0.7 if trend == "多头" else 0.3,
+                "rating": trend,
+                "values": {
+                    "MACD": macd_val,
+                    "Signal": macd.get("Signal"),
+                    "Histogram": histogram
+                }
+            }
+        
+        # RSI 分析
+        rsi = tech_indicators.get("rsi", {})
+        if rsi:
+            rsi_val = rsi.get("RSI")
+            rsi_signal = rsi.get("Signal", "正常")
+            
+            if rsi_val:
+                if rsi_val > 70:
+                    rsi_score = 0.3
+                elif rsi_val < 30:
+                    rsi_score = 0.7
+                else:
+                    rsi_score = 0.5
+            else:
+                rsi_score = 0.5
+            
+            result["rsi"] = {
+                "score": rsi_score,
+                "rating": rsi_signal,
+                "values": {"RSI": rsi_val}
+            }
+        
+        # KDJ 分析
+        kdj = tech_indicators.get("kdj", {})
+        if kdj:
+            k_val = kdj.get("K")
+            d_val = kdj.get("D")
+            j_val = kdj.get("J")
+            kdj_signal = kdj.get("Signal", "正常")
+            
+            if j_val:
+                if j_val > 100:
+                    kdj_score = 0.2
+                elif j_val < 0:
+                    kdj_score = 0.8
+                else:
+                    kdj_score = 0.5
+            else:
+                kdj_score = 0.5
+            
+            result["kdj"] = {
+                "score": kdj_score,
+                "rating": kdj_signal,
+                "values": {"K": k_val, "D": d_val, "J": j_val}
+            }
+        
+        # 布林带分析
+        bollinger = tech_indicators.get("bollinger", {})
+        if bollinger:
+            position = bollinger.get("Position", 0.5)
+            boll_signal = bollinger.get("Signal", "中轨附近")
+            
+            result["bollinger"] = {
+                "score": 0.5 + (0.5 - position) * 0.4,  # 越接近下轨越看涨
+                "rating": boll_signal,
+                "values": {
+                    "Upper": bollinger.get("Upper"),
+                    "Middle": bollinger.get("Middle"),
+                    "Lower": bollinger.get("Lower"),
+                    "Position": position
+                }
+            }
+        
+        return result
+    
+    def _generate_signals_from_indicators(self, tech_indicators: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        从技术指标生成信号
+        
+        Args:
+            tech_indicators: 技术指标字典
+            
+        Returns:
+            信号列表
+        """
+        signals = []
+        
+        # 从工具获取预设信号
+        tool_signals = tech_indicators.get("signals", [])
+        for sig in tool_signals:
+            signals.append({
+                "indicator": "综合",
+                "signal": sig,
+                "strength": "中",
+                "description": sig
+            })
+        
+        # MACD 信号
+        macd = tech_indicators.get("macd", {})
+        if macd.get("Trend") == "多头":
+            signals.append({
+                "indicator": "MACD",
+                "signal": "多头趋势",
+                "strength": "强" if macd.get("Histogram", 0) > 0 else "中",
+                "description": "MACD 处于多头区间"
+            })
+        elif macd.get("Trend") == "空头":
+            signals.append({
+                "indicator": "MACD",
+                "signal": "空头趋势",
+                "strength": "强" if macd.get("Histogram", 0) < 0 else "中",
+                "description": "MACD 处于空头区间"
+            })
+        
+        # RSI 信号
+        rsi = tech_indicators.get("rsi", {})
+        rsi_val = rsi.get("RSI")
+        if rsi_val:
+            if rsi_val < 30:
+                signals.append({
+                    "indicator": "RSI",
+                    "signal": "超卖",
+                    "strength": "强",
+                    "description": f"RSI = {rsi_val:.1f}，超卖区域，可能反弹"
+                })
+            elif rsi_val > 70:
+                signals.append({
+                    "indicator": "RSI",
+                    "signal": "超买",
+                    "strength": "强",
+                    "description": f"RSI = {rsi_val:.1f}，超买区域，注意回调"
+                })
+        
+        # KDJ 信号
+        kdj = tech_indicators.get("kdj", {})
+        j_val = kdj.get("J")
+        if j_val is not None:
+            if j_val < 0:
+                signals.append({
+                    "indicator": "KDJ",
+                    "signal": "超卖",
+                    "strength": "中",
+                    "description": f"J值 = {j_val:.1f}，严重超卖"
+                })
+            elif j_val > 100:
+                signals.append({
+                    "indicator": "KDJ",
+                    "signal": "超买",
+                    "strength": "中",
+                    "description": f"J值 = {j_val:.1f}，严重超买"
+                })
+        
+        return signals
+    
+    def _calculate_rating_from_indicators(
+        self,
+        factor_analysis: Dict[str, Any],
+        signals: List[Dict[str, Any]]
+    ) -> tuple:
+        """
+        从技术指标计算综合评级
+        
+        Args:
+            factor_analysis: 技术指标分析结果
+            signals: 信号列表
+            
+        Returns:
+            (评级, 置信度)
+        """
+        # 计算各指标得分
+        scores = []
+        
+        for key in ["moving_average", "macd", "rsi", "kdj", "bollinger"]:
+            if key in factor_analysis:
+                scores.append(factor_analysis[key].get("score", 0.5))
+        
+        if not scores:
+            return "中性", 0.0
+        
+        # 加权平均
+        total_score = sum(scores) / len(scores)
+        
+        # 信号加权
+        signal_weight = 0
+        for signal in signals:
+            if signal["signal"] in ["多头趋势", "金叉", "超卖"]:
+                signal_weight += 0.1
+            elif signal["signal"] in ["空头趋势", "死叉", "超买"]:
+                signal_weight -= 0.1
+        
+        final_score = total_score + signal_weight
+        final_score = max(0, min(1, final_score))  # 限制在 0-1
+        
+        # 确定评级
+        if final_score > 0.6:
+            rating = "看涨"
+        elif final_score < 0.4:
+            rating = "看跌"
+        else:
+            rating = "中性"
+        
+        # 置信度
+        confidence = abs(final_score - 0.5) * 2
+        
+        return rating, confidence
 
 
 def main():
