@@ -7,8 +7,28 @@
 // API 基础 URL
 const API_BASE_URL = '/api';
 
+// 常见股票映射（本地搜索建议）
+const POPULAR_STOCKS = {
+    "贵州茅台": "sh600519",
+    "五粮液": "sz000858",
+    "宁德时代": "sz300750",
+    "比亚迪": "sz002594",
+    "招商银行": "sh600036",
+    "中国平安": "sh601318",
+    "工商银行": "sh601398",
+    "恒瑞医药": "sh600276",
+    "美的集团": "sz000333",
+    "隆基绿能": "sh601012",
+    "中国石油": "sh601857",
+    "中国石化": "sh600028",
+    "中国移动": "sh600941",
+    "伊利股份": "sh600887",
+    "海天味业": "sh603288"
+};
+
 // DOM 元素
 const stockCodeInput = document.getElementById('stockCode');
+const suggestionsDiv = document.getElementById('suggestions');
 const timeHorizonInput = document.getElementById('timeHorizon');
 const parallelModeCheckbox = document.getElementById('parallelMode');
 const analyzeBtn = document.getElementById('analyzeBtn');
@@ -26,7 +46,64 @@ document.addEventListener('DOMContentLoaded', () => {
             handleAnalyze();
         }
     });
+    
+    // 搜索建议
+    stockCodeInput.addEventListener('input', handleSearchSuggestions);
+    
+    // 点击外部关闭建议
+    document.addEventListener('click', (e) => {
+        if (!stockCodeInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
 });
+
+/**
+ * 处理搜索建议
+ */
+function handleSearchSuggestions() {
+    const query = stockCodeInput.value.trim().toLowerCase();
+    
+    if (query.length < 1) {
+        suggestionsDiv.style.display = 'none';
+        return;
+    }
+    
+    const matches = [];
+    
+    // 搜索本地股票库
+    for (const [name, code] of Object.entries(POPULAR_STOCKS)) {
+        if (name.toLowerCase().includes(query) || code.toLowerCase().includes(query)) {
+            matches.push({ name, code });
+        }
+        if (matches.length >= 5) break;
+    }
+    
+    if (matches.length === 0) {
+        suggestionsDiv.style.display = 'none';
+        return;
+    }
+    
+    // 显示建议
+    suggestionsDiv.innerHTML = matches.map(item => `
+        <div class="suggestion-item" onclick="selectSuggestion('${item.code}', '${item.name}')">
+            <span class="suggestion-name">${item.name}</span>
+            <span class="suggestion-code">${item.code}</span>
+        </div>
+    `).join('');
+    
+    suggestionsDiv.style.display = 'block';
+}
+
+/**
+ * 选择建议
+ */
+function selectSuggestion(code, name) {
+    stockCodeInput.value = name;
+    suggestionsDiv.style.display = 'none';
+    // 自动触发分析
+    handleAnalyze();
+}
 
 /**
  * 处理分析请求
@@ -85,25 +162,30 @@ async function handleAnalyze() {
 
 /**
  * 格式化股票代码
- * 添加 SH 或 SZ 前缀
+ * 添加 SH 或 SZ 前缀（仅对纯数字代码）
  */
 function formatStockCode(code) {
-    // 已经有前缀
-    if (code.startsWith('SH') || code.startsWith('SZ')) {
+    // 中文名称直接返回（API 会处理）
+    if (/[\u4e00-\u9fa5]/.test(code)) {
         return code;
     }
     
-    // 根据代码判断交易所
-    const codeNum = parseInt(code);
-    if (isNaN(codeNum)) {
+    // 已经有前缀
+    if (code.toLowerCase().startsWith('sh') || code.toLowerCase().startsWith('sz')) {
+        return code.toUpperCase();
+    }
+    
+    // 纯数字代码，添加前缀
+    const codeNum = code.replace(/[^0-9]/g, '');
+    if (!codeNum) {
         return code;
     }
     
     // 6 开头为上海，0/3 开头为深圳
-    if (code.startsWith('6')) {
-        return `SH${code}`;
-    } else if (code.startsWith('0') || code.startsWith('3')) {
-        return `SZ${code}`;
+    if (codeNum.startsWith('6')) {
+        return `SH${codeNum}`;
+    } else if (codeNum.startsWith('0') || codeNum.startsWith('3')) {
+        return `SZ${codeNum}`;
     }
     
     return code;

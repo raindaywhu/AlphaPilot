@@ -17,8 +17,9 @@
         <!-- 输入区域 -->
         <div class="input-section">
             <div class="input-group">
-                <label for="stockCode">股票代码</label>
-                <input type="text" id="stockCode" placeholder="输入股票代码，如 600519" />
+                <label for="stockCode">股票代码或名称</label>
+                <input type="text" id="stockCode" placeholder="输入股票代码或名称，如 600519 或 贵州茅台" autocomplete="off" />
+                <div id="suggestions" class="suggestions" style="display: none;"></div>
             </div>
             <div class="input-group">
                 <label for="timeHorizon">预测周期（天）</label>
