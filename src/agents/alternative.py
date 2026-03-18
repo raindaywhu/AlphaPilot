@@ -438,54 +438,63 @@ class AlternativeAnalyst:
         """
         ak = self._get_akshare()
         
-        try:
-            # 获取大盘指数
-            df = ak.stock_zh_index_spot_em()
-            
-            # 提取主要指数
-            indices = ["上证指数", "深证成指", "创业板指"]
-            
-            result = {
-                "market_sentiment": "中性",
-                "indices": {}
-            }
-            
-            for idx_name in indices:
-                try:
-                    row = df[df['名称'] == idx_name]
-                    if len(row) > 0:
-                        change_pct = float(row.iloc[0].get('涨跌幅', 0))
-                        result["indices"][idx_name] = {
-                            "price": float(row.iloc[0].get('最新价', 0)),
-                            "change_pct": round(change_pct, 2)
-                        }
-                except:
-                    pass
-            
-            # 计算市场情绪
-            total_change = sum(
-                v.get("change_pct", 0) 
-                for v in result["indices"].values()
-            )
-            avg_change = total_change / len(result["indices"]) if result["indices"] else 0
-            
-            if avg_change > 1.0:
-                result["market_sentiment"] = "偏乐观"
-            elif avg_change < -1.0:
-                result["market_sentiment"] = "偏悲观"
-            else:
-                result["market_sentiment"] = "中性"
-            
-            result["avg_change_pct"] = round(avg_change, 2)
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"获取市场情绪数据失败: {e}")
-            return {
-                "error": "无法获取市场情绪数据",
-                "market_sentiment": "未知"
-            }
+        result = {
+            "market_sentiment": "中性",
+            "indices": {}
+        }
+        
+        # 重试机制
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # 获取大盘指数（设置超时）
+                df = ak.stock_zh_index_spot_em()
+                
+                # 提取主要指数
+                indices = ["上证指数", "深证成指", "创业板指"]
+                
+                for idx_name in indices:
+                    try:
+                        row = df[df['名称'] == idx_name]
+                        if len(row) > 0:
+                            change_pct = float(row.iloc[0].get('涨跌幅', 0))
+                            result["indices"][idx_name] = {
+                                "price": float(row.iloc[0].get('最新价', 0)),
+                                "change_pct": round(change_pct, 2)
+                            }
+                    except:
+                        pass
+                
+                # 计算市场情绪
+                total_change = sum(
+                    v.get("change_pct", 0) 
+                    for v in result["indices"].values()
+                )
+                avg_change = total_change / len(result["indices"]) if result["indices"] else 0
+                
+                if avg_change > 1.0:
+                    result["market_sentiment"] = "偏乐观"
+                elif avg_change < -1.0:
+                    result["market_sentiment"] = "偏悲观"
+                else:
+                    result["market_sentiment"] = "中性"
+                
+                result["avg_change_pct"] = round(avg_change, 2)
+                
+                return result
+                
+            except Exception as e:
+                logger.warning(f"获取市场情绪数据失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    import time
+                    time.sleep(1)  # 等待 1 秒后重试
+                else:
+                    logger.error(f"获取市场情绪数据最终失败: {e}")
+        
+        # 所有重试都失败，返回默认值
+        result["error"] = "无法获取市场情绪数据（已重试）"
+        result["market_sentiment"] = "未知"
+        return result
 
     def _extract_json(self, text: str) -> Dict[str, Any]:
         """

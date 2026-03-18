@@ -377,7 +377,9 @@ class QuantitativeAnalyst:
         else:
             rating = "中性"
         
-        confidence = abs(score - 50) / 100.0
+        # 置信度计算：基于评分偏离程度，但设置最小值
+        # 中性(50分)时置信度为最小值 0.3，而非 0
+        confidence = max(0.3, abs(score - 50) / 100.0)
         
         return {
             "agent": "quant_analyst",
