@@ -19,11 +19,11 @@ import re
 import os
 from pathlib import Path
 
-# 导入 Crew
+# 导入 Flow（替代 Crew 直接调用）
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from src.crew.investment_crew import InvestmentCrew
+from src.flow.investment_flow import InvestmentAnalysisFlow
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -131,14 +131,13 @@ async def analyze_stock(request: AnalyzeRequest):
     logger.info(f"开始分析股票: {request.stock_code}")
     
     try:
-        # 初始化 Crew
-        crew = InvestmentCrew(use_mock=False)
+        # 初始化 Flow（使用工作流编排）
+        flow = InvestmentAnalysisFlow(use_mock=False)
         
         # 执行分析
-        result = crew.analyze(
+        result = flow.run(
             stock_code=request.stock_code,
-            parallel=request.parallel,
-            time_horizon=request.time_horizon
+            parallel=request.parallel
         )
         
         # 构造响应
