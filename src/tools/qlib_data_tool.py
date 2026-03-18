@@ -187,7 +187,6 @@ class QlibDataTool:
         try:
             # 标准化股票代码
             mootdx_symbol = symbol.lower().replace('sh', '').replace('sz', '')
-            market = 1 if symbol.lower().startswith('sh') or symbol.startswith('6') else 0
             
             # 创建 mootdx 客户端
             client = Quotes.factory(market='std')
@@ -200,26 +199,20 @@ class QlibDataTool:
                 start=0
             )
             
-            if bars is None or len(bars) == 0:
+            if bars is None or bars.empty:
                 logger.warning(f"mootdx 也没有 {symbol} 的数据")
                 return None
             
-            # 转换为 DataFrame
-            df = pd.DataFrame(bars)
+            # 转换为 DataFrame（重置索引避免歧义）
+            df = bars.reset_index(drop=True)
             
             # 处理 datetime 列
             if 'datetime' in df.columns:
                 df['datetime'] = pd.to_datetime(df['datetime'])
-            else:
-                # 使用索引作为 datetime
-                df = df.reset_index(drop=True)
-                df['datetime'] = pd.date_range(end=datetime.now(), periods=len(df), freq='D')
             
             # 确保列名正确
-            column_mapping = {}
-            if 'vol' in df.columns:
-                column_mapping['vol'] = 'volume'
-            df = df.rename(columns=column_mapping)
+            if 'vol' in df.columns and 'volume' not in df.columns:
+                df['volume'] = df['vol']
             
             # 选择需要的列
             required_cols = ['datetime', 'open', 'close', 'high', 'low', 'volume']
