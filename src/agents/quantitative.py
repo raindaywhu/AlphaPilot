@@ -22,6 +22,7 @@ from langchain_openai import ChatOpenAI
 
 # 导入工具
 from ..tools.alpha158_tool import Alpha158Tool
+from ..tools.mootdx_tool import MootdxTool
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -66,6 +67,7 @@ class QuantitativeAnalyst:
 
         # 初始化工具
         self.alpha158_tool = Alpha158Tool()
+        self.mootdx_tool = MootdxTool()  # 新增：全 A 股数据工具
 
         # 创建 CrewAI Agent
         self.agent = self._create_agent()
@@ -163,6 +165,51 @@ class QuantitativeAnalyst:
         """
         logger.info(f"开始分析股票: {stock_code}")
 
+        # 优先使用 MootdxTool（支持全 A 股）
+        try:
+            logger.info(f"使用 MootdxTool 获取数据...")
+            mootdx_result = self.mootdx_tool.analyze(stock_code)
+            
+            if mootdx_result.get('success'):
+                logger.info(f"MootdxTool 分析成功")
+                
+                # 构建 MootdxTool 的分析结果
+                result = {
+                    "agent": "quant_analyst",
+                    "stock_code": stock_code,
+                    "analysis_date": datetime.now().strftime("%Y-%m-%d"),
+                    "analysis_type": analysis_type,
+                    "time_horizon": time_horizon,
+                    "data_validation": {
+                        "status": "valid",
+                        "latest_data_date": mootdx_result.get('latest_date'),
+                        "data_points": mootdx_result.get('data_points'),
+                        "warnings": []
+                    },
+                    "overall_rating": mootdx_result.get('rating', '中性'),
+                    "confidence": mootdx_result.get('score', 50) / 100.0,
+                    "factor_analysis": {
+                        "technical_indicators": mootdx_result.get('indicators', {}),
+                        "trend": mootdx_result.get('analysis', {}).get('trend', {}),
+                        "macd": mootdx_result.get('analysis', {}).get('macd_signal', {}),
+                        "rsi": mootdx_result.get('analysis', {}).get('rsi_signal', {}),
+                        "kdj": mootdx_result.get('analysis', {}).get('kdj_signal', {})
+                    },
+                    "signals": self._extract_signals(mootdx_result),
+                    "risk_warning": [
+                        "MootdxTool 基于技术指标分析",
+                        "建议结合基本面分析"
+                    ],
+                    "conclusion": self._build_conclusion(mootdx_result)
+                }
+                
+                logger.info(f"分析完成: {stock_code}")
+                return result
+                
+        except Exception as e:
+            logger.warning(f"MootdxTool 分析失败: {e}，尝试使用 Alpha158Tool...")
+
+        # 回退到 Alpha158Tool（仅支持 csi300）
         # 获取 Alpha158 因子数据
         try:
             # 使用最近3个月的数据
@@ -440,6 +487,120 @@ class QuantitativeAnalyst:
             signal_desc = "、".join([s["signal"] for s in signals[:3]])
             parts.append(f"信号：{signal_desc}")
 
+        return "，".join(parts)
+    
+    def _extract_signals(self, mootdx_result: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        从 MootdxTool 结果中提取信号
+        
+        Args:
+            mootdx_result: MootdxTool 分析结果
+        
+        Returns:
+            信号列表
+        """
+        signals = []
+        analysis = mootdx_result.get('analysis', {})
+        
+        # 趋势信号
+        trend = analysis.get('trend', {})
+        if trend.get('ma_trend') == 'bullish':
+            signals.append({
+                "indicator": "MA",
+                "signal": "多头排列",
+                "strength": "强",
+                "description": trend.get('description', '')
+            })
+        elif trend.get('ma_trend') == 'bearish':
+            signals.append({
+                "indicator": "MA",
+                "signal": "空头排列",
+                "strength": "强",
+                "description": trend.get('description', '')
+            })
+        
+        # MACD 信号
+        macd = analysis.get('macd_signal', {})
+        if macd.get('signal') == 'golden_cross':
+            signals.append({
+                "indicator": "MACD",
+                "signal": "金叉",
+                "strength": "强",
+                "description": macd.get('description', '')
+            })
+        elif macd.get('signal') == 'death_cross':
+            signals.append({
+                "indicator": "MACD",
+                "signal": "死叉",
+                "strength": "强",
+                "description": macd.get('description', '')
+            })
+        
+        # RSI 信号
+        rsi = analysis.get('rsi_signal', {})
+        if rsi.get('signal') == 'oversold':
+            signals.append({
+                "indicator": "RSI",
+                "signal": "超卖",
+                "strength": "中",
+                "description": rsi.get('description', '')
+            })
+        elif rsi.get('signal') == 'overbought':
+            signals.append({
+                "indicator": "RSI",
+                "signal": "超买",
+                "strength": "中",
+                "description": rsi.get('description', '')
+            })
+        
+        # KDJ 信号
+        kdj = analysis.get('kdj_signal', {})
+        if kdj.get('signal') == 'bullish':
+            signals.append({
+                "indicator": "KDJ",
+                "signal": "看涨",
+                "strength": "中",
+                "description": kdj.get('description', '')
+            })
+        elif kdj.get('signal') == 'bearish':
+            signals.append({
+                "indicator": "KDJ",
+                "signal": "看跌",
+                "strength": "中",
+                "description": kdj.get('description', '')
+            })
+        
+        return signals
+    
+    def _build_conclusion(self, mootdx_result: Dict[str, Any]) -> str:
+        """
+        构建 MootdxTool 分析的结论
+        
+        Args:
+            mootdx_result: MootdxTool 分析结果
+        
+        Returns:
+            结论文本
+        """
+        rating = mootdx_result.get('rating', '中性')
+        score = mootdx_result.get('score', 50)
+        analysis = mootdx_result.get('analysis', {})
+        
+        parts = [f"技术面{rating}"]
+        
+        # 添加趋势
+        trend = analysis.get('trend', {})
+        if trend.get('ma_trend'):
+            parts.append(f"均线{trend['ma_trend']}")
+        
+        # 添加 MACD
+        macd = analysis.get('macd_signal', {})
+        if macd.get('signal'):
+            parts.append(f"MACD{macd['signal']}")
+        
+        # 添加评分
+        parts.append(f"综合评分{score}分")
+        
         return "，".join(parts)
 
 
