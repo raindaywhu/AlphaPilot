@@ -27,6 +27,7 @@ from src.agents.decision_maker import DecisionMaker
 # 导入 Tools
 from src.tools.qlib_data_tool import QlibDataTool
 from src.tools.report_generator import ReportGenerator
+from src.tools.stock_lookup import StockLookupTool
 
 logger = logging.getLogger(__name__)
 
@@ -142,14 +143,13 @@ class InvestmentAnalysisFlow:
         # 设置股票代码
         self.state["stock_code"] = stock_code
         
-        # 获取股票名称
-        stock_names = {
-            "sh600519": "贵州茅台",
-            "sh600036": "招商银行",
-            "sz000858": "五粮液",
-            "sh601318": "中国平安"
-        }
-        self.state["stock_name"] = stock_names.get(stock_code.lower(), stock_code)
+        # 使用 StockLookupTool 获取股票名称
+        stock_info = StockLookupTool.lookup(stock_code)
+        if stock_info:
+            self.state["stock_code"] = stock_info["code"]  # 标准化代码
+            self.state["stock_name"] = stock_info["name"]
+        else:
+            self.state["stock_name"] = stock_code
         
         # 检查 qlib 数据
         try:
