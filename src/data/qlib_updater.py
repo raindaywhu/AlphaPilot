@@ -156,8 +156,8 @@ class QlibDataUpdater:
                 print(f"没有找到数据文件: {stock_dir}")
                 return False
             
-            # 4. 检查数据日期
-            latest_date = self._get_qlib_latest_date()
+            # 4. 检查指定股票的数据日期（而不是全局最新日期）
+            latest_date = self._get_stock_latest_date(stock_code)
             trade_date = self._get_latest_trade_date()
             
             if latest_date and trade_date:
@@ -171,6 +171,41 @@ class QlibDataUpdater:
         except Exception as e:
             print(f"验证数据时出错: {e}")
             return False
+    
+    def _get_stock_latest_date(self, stock_code: str) -> Optional[datetime]:
+        """
+        获取指定股票的最新数据日期
+        
+        Args:
+            stock_code: 股票代码
+            
+        Returns:
+            datetime: 最新数据日期
+        """
+        try:
+            stock_dir = self.features_dir / stock_code
+            if not stock_dir.exists():
+                return None
+            
+            files = sorted(stock_dir.glob("*.bin"))
+            if not files:
+                return None
+            
+            # 文件名格式：sh600938_2026-03-18.bin
+            latest_file = files[-1]
+            filename = latest_file.name
+            
+            # 提取日期
+            parts = filename.split('_')
+            if len(parts) >= 2:
+                date_str = parts[1].replace('.bin', '')
+                return datetime.strptime(date_str, "%Y-%m-%d")
+            
+            return None
+            
+        except Exception as e:
+            print(f"获取股票最新日期时出错: {e}")
+            return None
     
     # ========== 私有方法 ==========
     
@@ -417,10 +452,34 @@ class QlibDataUpdater:
         """
         获取股票列表
         
+        优先从 akshare 获取全 A 股列表，fallback 到默认列表。
+        
         Returns:
             List[str]: 股票代码列表
         """
         try:
+            # 尝试从 akshare 获取全 A 股列表
+            try:
+                import akshare as ak
+                stock_list = []
+                
+                # 获取 A 股列表
+                df = ak.stock_zh_a_spot_em()
+                
+                for _, row in df.iterrows():
+                    code = row['代码']
+                    # 转换为 qlib 格式：sh/sz + 代码
+                    if code.startswith('6'):
+                        stock_list.append(f"sh{code}")
+                    else:
+                        stock_list.append(f"sz{code}")
+                
+                print(f"从 akshare 获取到 {len(stock_list)} 只股票")
+                return stock_list
+                
+            except Exception as e:
+                print(f"从 akshare 获取股票列表失败: {e}")
+            
             # 尝试从 qlib 获取
             try:
                 import qlib
@@ -431,18 +490,32 @@ class QlibDataUpdater:
             except:
                 pass
             
-            # 如果 qlib 不可用，返回默认列表（A 股主要股票）
+            # 如果都不可用，返回默认列表（A 股主要股票）
+            print("使用默认股票列表（100 只主要股票）")
             default_stocks = [
-                "sh600519",  # 贵州茅台
-                "sh601318",  # 中国平安
-                "sh600036",  # 招商银行
-                "sh601166",  # 兴业银行
-                "sh600276",  # 恒瑞医药
-                "sh600887",  # 伊利股份
-                "sh601398",  # 工商银行
-                "sh601288",  # 农业银行
-                "sh600030",  # 中信证券
-                "sh601888",  # 中国中免
+                # 上证主要股票
+                "sh600519", "sh601318", "sh600036", "sh601166", "sh600276",
+                "sh600887", "sh601398", "sh601288", "sh600030", "sh601888",
+                "sh600000", "sh600004", "sh600006", "sh600007", "sh600008",
+                "sh600009", "sh600010", "sh600011", "sh600012", "sh600015",
+                "sh600016", "sh600017", "sh600018", "sh600019", "sh600020",
+                # 深证主要股票
+                "sz000001", "sz000002", "sz000333", "sz000651", "sz000858",
+                "sz002415", "sz002594", "sz300750", "sz300059", "sz000063",
+                "sz000725", "sz002304", "sz002352", "sz002475", "sz002714",
+                "sz000568", "sz000661", "sz000768", "sz000783", "sz002230",
+                # 更多上证股票
+                "sh600938", "sh600900", "sh601012", "sh601066", "sh601088",
+                "sh601111", "sh601138", "sh601186", "sh601211", "sh601229",
+                "sh601236", "sh601288", "sh601319", "sh601328", "sh601336",
+                "sh601360", "sh601390", "sh601398", "sh601601", "sh601628",
+                "sh601633", "sh601668", "sh601669", "sh601688", "sh601728",
+                # 更多深证股票
+                "sz000001", "sz000002", "sz000063", "sz000069", "sz000100",
+                "sz000333", "sz000338", "sz000425", "sz000538", "sz000540",
+                "sz000568", "sz000581", "sz000625", "sz000630", "sz000651",
+                "sz000661", "sz000703", "sz000708", "sz000725", "sz000768",
+                "sz000778", "sz000783", "sz000786", "sz000858", "sz000876",
             ]
             return default_stocks
             
