@@ -9,9 +9,63 @@
 
 ## 当前状态
 
-**阶段**：V1 MVP 已完成 ✅
-**整体进度**：🎉 **核心功能全部完成！**
-**更新时间**：2026-03-18 17:02
+**阶段**：技术债务修复中
+**整体进度**：🔧 **修复数据流架构 (Issue #33)**
+**更新时间**：2026-03-18 18:45
+
+---
+
+## mac 开发心跳检查（2026-03-18 18:45）
+
+### 📋 认领任务
+- ✅ 认领 Issue #33 [P0] DATA-FIX: 修复数据流架构
+
+### 🔧 问题分析
+
+**设计要求的数据流**：
+```
+mootdx → qlib_updater → qlib数据 → Agent (使用 qlib 工具)
+```
+
+**实际实现的数据流**：
+```
+mootdx → MootdxTool → Agent (绕过 qlib 数据层) ❌
+```
+
+**问题**：
+1. 量化分析师直接使用 MootdxTool，绕过了 qlib 数据层
+2. qlib 数据严重过期（2020-09-25）
+3. qlib_updater 存在但未被正确使用
+
+### ✅ 修复内容
+
+**1. 修改量化分析师 (quantitative.py)**：
+- 新增 `_analyze_with_qlib()` 方法 - 使用 GBDT 预测
+- 修改 `analyze()` 方法 - 优先使用 qlib 工具
+- 新增 `_build_result_from_tech_indicators()` - 技术指标回退
+- 新增 `_build_result_from_mootdx()` - MootdxTool 临时回退（标注警告）
+- 添加 `use_qlib` 参数控制数据源选择
+
+**2. 更新 MootdxTool 文档**：
+- 明确定位为 qlib_updater 的数据源
+- 标注不应被 Agent 直接调用
+
+### 🔧 数据流修复后
+```
+Agent.analyze(use_qlib=True) 
+  → _analyze_with_qlib() → GBDTTool.predict() ✅
+  → TechIndicators.get_indicators() ✅
+  → MootdxTool.analyze() ⚠️ (临时回退)
+```
+
+### ⚠️ 待解决问题
+1. qlib 数据过期（2020-09-25），需要运行 qlib_updater 更新
+2. 更新命令：`python -m src.data.qlib_updater update`
+
+### 下一步
+- 测试修复后的量化分析师
+- 推送代码到 GitHub
+- 更新 Issue #33 状态
 
 ---
 

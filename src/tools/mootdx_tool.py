@@ -5,6 +5,16 @@ Mootdx 数据工具
 
 解决 TECH-001: 修复量化数据源 - 支持全 A 股
 优化 OPT-001: 添加缓存和连接复用
+
+⚠️ 数据流定位 (Issue #33):
+- 此工具应作为 qlib_updater 的数据源
+- Agent 不应直接调用此工具
+- 正确数据流: mootdx → qlib_updater → qlib数据 → Agent (使用 qlib 工具)
+
+使用场景:
+1. qlib_updater 使用此工具下载数据
+2. 测试/调试时获取实时数据
+3. qlib 数据未更新时的临时回退（不推荐）
 """
 
 import os
