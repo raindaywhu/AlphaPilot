@@ -9,7 +9,7 @@ Issue: #20 (API-001)
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import logging
 from datetime import datetime
 
@@ -53,12 +53,15 @@ class AnalyzeResponse(BaseModel):
     """股票分析响应"""
     stock_code: str
     analysis_date: str
-    overall_rating: float
+    overall_rating: str  # 综合评级：看涨/中性偏多/中性/中性偏空/看跌
     confidence: float
+    score: float = Field(0.5, description="数值化得分 0-1")
     quantitative: Dict[str, Any]
     macro: Dict[str, Any]
     alternative: Dict[str, Any]
     summary: str
+    risk_warnings: List[str] = Field(default_factory=list)
+    disclaimer: str = ""
     execution_time: str
 
 
@@ -113,12 +116,15 @@ async def analyze_stock(request: AnalyzeRequest):
         response = AnalyzeResponse(
             stock_code=result.get("stock_code", request.stock_code),
             analysis_date=result.get("analysis_date", datetime.now().strftime("%Y-%m-%d")),
-            overall_rating=result.get("overall_rating", 0.0),
-            confidence=result.get("confidence", 0.0),
-            quantitative=result.get("quantitative", {}),
-            macro=result.get("macro", {}),
-            alternative=result.get("alternative", {}),
+            overall_rating=result.get("overall_rating", "中性"),
+            confidence=result.get("confidence", 0.5),
+            score=result.get("score", 0.5),
+            quantitative=result.get("agent_results", {}).get("quantitative", {}),
+            macro=result.get("agent_results", {}).get("macro", {}),
+            alternative=result.get("agent_results", {}).get("alternative", {}),
             summary=result.get("summary", ""),
+            risk_warnings=result.get("risk_warnings", []),
+            disclaimer=result.get("disclaimer", ""),
             execution_time=result.get("execution_time", "0s")
         )
         
