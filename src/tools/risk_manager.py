@@ -50,7 +50,8 @@ class RiskManager:
     @timing_decorator
     def assess_risk(
         self,
-        analysis_result: Dict[str, Any],
+        analysis_result: Dict[str, Any] = None,
+        stock_code: str = None,
         portfolio_value: float = 100000,
         current_positions: Optional[List[Dict]] = None
     ) -> Dict[str, Any]:
@@ -58,7 +59,8 @@ class RiskManager:
         风险评估
         
         Args:
-            analysis_result: 分析结果
+            analysis_result: 分析结果（可选）
+            stock_code: 股票代码（可选，如果未提供 analysis_result）
             portfolio_value: 投资组合总值
             current_positions: 当前持仓
         
@@ -66,6 +68,21 @@ class RiskManager:
             风险评估结果
         """
         logger.info("开始风险评估")
+        
+        # 支持直接传入 stock_code
+        if analysis_result is None:
+            analysis_result = {
+                "stock_code": stock_code or "Unknown",
+                "overall_rating": "中性",
+                "confidence": 0.5
+            }
+        elif isinstance(analysis_result, str):
+            # 如果传入的是字符串，作为 stock_code 处理
+            analysis_result = {
+                "stock_code": analysis_result,
+                "overall_rating": "中性",
+                "confidence": 0.5
+            }
         
         stock_code = analysis_result.get("stock_code", "Unknown")
         overall_rating = analysis_result.get("overall_rating", "中性")

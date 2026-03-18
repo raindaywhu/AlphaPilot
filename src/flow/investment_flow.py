@@ -266,7 +266,7 @@ class InvestmentAnalysisFlow:
             }
             
             # 生成报告
-            report_path = self.report_generator.generate(report_data)
+            report_path = self.report_generator.generate_pdf(report_data)
             self.state["report_path"] = report_path
             
             logger.info(f"报告生成完成: {report_path}")

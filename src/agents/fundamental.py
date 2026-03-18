@@ -154,33 +154,34 @@ class FundamentalAnalyst:
         try:
             fundamental_result = self.fundamental_analyzer.analyze(stock_code)
             
-            if fundamental_result.get('success'):
+            # 检查返回结果是否有效
+            if fundamental_result and fundamental_result.get('overall_rating'):
                 # 构建分析结果
                 result = {
                     "agent": "fundamental_analyst",
                     "stock_code": stock_code,
                     "analysis_date": datetime.now().strftime("%Y-%m-%d"),
                     "analysis_type": analysis_type,
-                    "overall_rating": fundamental_result.get('rating', '中性'),
+                    "overall_rating": fundamental_result.get('overall_rating', '中性'),
                     "confidence": fundamental_result.get('confidence', 0.5),
-                    "financial_analysis": fundamental_result.get('financial_analysis', {}),
+                    "financial_analysis": fundamental_result.get('financial_data', {}),
                     "valuation": fundamental_result.get('valuation', {}),
                     "industry_comparison": fundamental_result.get('industry_comparison', {}),
-                    "risk_warning": fundamental_result.get('risk_warning', []),
+                    "risk_warning": [],
                     "conclusion": fundamental_result.get('conclusion', '')
                 }
                 
                 logger.info(f"基本面分析完成: {stock_code}")
                 return result
             else:
-                logger.warning(f"基本面分析失败: {fundamental_result.get('error')}")
+                logger.warning(f"基本面分析返回无效结果")
                 return {
                     "agent": "fundamental_analyst",
                     "stock_code": stock_code,
                     "analysis_date": datetime.now().strftime("%Y-%m-%d"),
                     "overall_rating": "中性",
                     "confidence": 0.0,
-                    "conclusion": f"基本面数据不足: {fundamental_result.get('error')}"
+                    "conclusion": "基本面数据不足"
                 }
                 
         except Exception as e:
