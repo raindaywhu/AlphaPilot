@@ -301,15 +301,18 @@
         
         <div class="search-box">
             <div class="search-form">
-                <input type="text" id="stockCode" placeholder="输入股票代码，如：sh600519" />
+                <input type="text" id="stockCode" placeholder="输入股票名称或代码，如：贵州茅台、600519" autocomplete="off" list="stockList" />
+                <datalist id="stockList"></datalist>
                 <button id="analyzeBtn" onclick="analyzeStock()">分析</button>
             </div>
             <div class="quick-picks">
                 <span>快速选择：</span>
-                <a href="#" onclick="quickPick('sh600519')">贵州茅台</a>
-                <a href="#" onclick="quickPick('sh600036')">招商银行</a>
-                <a href="#" onclick="quickPick('sz000858')">五粮液</a>
-                <a href="#" onclick="quickPick('sh601318')">中国平安</a>
+                <a href="#" onclick="quickPick('贵州茅台')">贵州茅台</a>
+                <a href="#" onclick="quickPick('招商银行')">招商银行</a>
+                <a href="#" onclick="quickPick('五粮液')">五粮液</a>
+                <a href="#" onclick="quickPick('中国平安')">中国平安</a>
+                <a href="#" onclick="quickPick('宁德时代')">宁德时代</a>
+                <a href="#" onclick="quickPick('比亚迪')">比亚迪</a>
             </div>
         </div>
         
@@ -330,16 +333,48 @@
     <script>
         const API_BASE = window.location.origin;
         
-        function quickPick(code) {
-            document.getElementById('stockCode').value = code;
+        // 常见股票列表（用于自动补全）
+        const POPULAR_STOCKS = [
+            {name: "贵州茅台", code: "sh600519"},
+            {name: "五粮液", code: "sz000858"},
+            {name: "招商银行", code: "sh600036"},
+            {name: "中国平安", code: "sh601318"},
+            {name: "宁德时代", code: "sz300750"},
+            {name: "比亚迪", code: "sz002594"},
+            {name: "贵州茅台", code: "sh600519"},
+            {name: "美的集团", code: "sz000333"},
+            {name: "格力电器", code: "sz000651"},
+            {name: "恒瑞医药", code: "sh600276"},
+            {name: "隆基绿能", code: "sh601012"},
+            {name: "东方财富", code: "sz300059"},
+            {name: "药明康德", code: "sh603259"},
+            {name: "中国石油", code: "sh601857"},
+            {name: "工商银行", code: "sh601398"},
+        ];
+        
+        // 初始化自动补全
+        function initAutocomplete() {
+            const datalist = document.getElementById('stockList');
+            POPULAR_STOCKS.forEach(stock => {
+                const option = document.createElement('option');
+                option.value = stock.name;
+                datalist.appendChild(option);
+            });
+        }
+        
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', initAutocomplete);
+        
+        function quickPick(name) {
+            document.getElementById('stockCode').value = name;
             analyzeStock();
             return false;
         }
         
         async function analyzeStock() {
-            const code = document.getElementById('stockCode').value.trim();
-            if (!code) {
-                alert('请输入股票代码');
+            const query = document.getElementById('stockCode').value.trim();
+            if (!query) {
+                alert('请输入股票名称或代码');
                 return;
             }
             
@@ -358,7 +393,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ stock_code: code })
+                    body: JSON.stringify({ stock_code: query })  // 支持名称或代码
                 });
                 
                 const data = await response.json();
@@ -376,8 +411,12 @@
             }
         }
         
-        function showResult(code, data) {
+        function showResult(query, data) {
             const result = document.getElementById('result');
+            
+            // 使用 API 返回的股票代码和名称
+            const stockCode = data.stock_code || query;
+            const stockName = data.stock_name || query;
             
             // 计算综合评级
             const rating = data.overall_rating || 'hold';
@@ -391,8 +430,8 @@
             let html = `
                 <div class="result-header">
                     <div class="stock-info">
-                        <h2>${data.stock_name || '未知股票'}</h2>
-                        <div class="code">${code}</div>
+                        <h2>${stockName}</h2>
+                        <div class="code">${stockCode}</div>
                     </div>
                     <div class="overall-rating">
                         <div class="rating-circle ${rating}">${ratingText}</div>

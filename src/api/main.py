@@ -24,6 +24,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from src.flow.investment_flow import InvestmentAnalysisFlow
+from src.tools.stock_lookup import StockLookupTool
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -55,7 +56,7 @@ if WEB_DIR.exists():
 
 class AnalyzeRequest(BaseModel):
     """股票分析请求"""
-    stock_code: str = Field(..., description="股票代码，如 SH600519", example="SH600519")
+    stock_code: str = Field(..., description="股票代码或名称，如 SH600519 或 贵州茅台", example="贵州茅台")
     parallel: bool = Field(True, description="是否并行分析")
     time_horizon: int = Field(5, description="预测周期（天）", ge=1, le=30)
 
@@ -124,11 +125,19 @@ async def analyze_stock(request: AnalyzeRequest):
     
     执行量化、基本面、宏观、另类、风控五维分析
     
-    - **stock_code**: 股票代码，如 SH600519
+    - **stock_code**: 股票代码或名称，如 SH600519 或 贵州茅台
     - **parallel**: 是否并行分析（默认 True）
     - **time_horizon**: 预测周期（天）
     """
-    logger.info(f"开始分析股票: {request.stock_code}")
+    # 查询股票信息（支持名称或代码）
+    stock_info = StockLookupTool.lookup(request.stock_code)
+    if not stock_info:
+        raise HTTPException(status_code=400, detail=f"无法识别股票: {request.stock_code}")
+    
+    stock_code = stock_info["code"]
+    stock_name = stock_info["name"]
+    
+    logger.info(f"开始分析股票: {stock_name} ({stock_code})")
     
     try:
         # 初始化 Flow（使用工作流编排）
@@ -154,9 +163,12 @@ async def analyze_stock(request: AnalyzeRequest):
         overall = result.get("overall_rating", "中性")
         rating = rating_map.get(overall, "hold")
         
+        # 使用查询到的股票名称
+        actual_stock_name = result.get("stock_name") or stock_name
+        
         response = AnalyzeResponse(
-            stock_code=result.get("stock_code", request.stock_code),
-            stock_name=result.get("stock_name", ""),
+            stock_code=stock_code,
+            stock_name=actual_stock_name,
             analysis_date=result.get("analysis_date", datetime.now().strftime("%Y-%m-%d")),
             overall_rating=rating,
             confidence=result.get("confidence", 0.5),
