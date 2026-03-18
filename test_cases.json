@@ -1,0 +1,10 @@
+[
+  {"name": "测试1: 标准代码格式", "stock_code": "600519", "expected": "success"},
+  {"name": "测试2: 股票名称", "stock_code": "贵州茅台", "expected": "success"},
+  {"name": "测试3: 带前缀代码", "stock_code": "SH600519", "expected": "success"},
+  {"name": "测试4: 深市股票", "stock_code": "000001", "expected": "success"},
+  {"name": "测试5: 无效代码", "stock_code": "999999", "expected": "error"},
+  {"name": "测试6: 空代码", "stock_code": "", "expected": "error"},
+  {"name": "测试7: 特殊字符", "stock_code": "abc123", "expected": "error"},
+  {"name": "测试8: 潍柴动力", "stock_code": "潍柴动力", "expected": "success"}
+]

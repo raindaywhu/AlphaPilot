@@ -206,11 +206,6 @@ async def analyze_stock(request: AnalyzeRequest):
     - **parallel**: 是否并行分析（默认 False）
     - **time_horizon**: 预测周期（天）
     """
-
-- **stock_code**: 股票代码或名称，如 SH600519、贵州茅台、茅台
-    - **parallel**: 是否并行分析（默认 False）
-    - **time_horizon**: 预测周期（天）
-    """
     # 查询股票信息（支持名称或代码）
     # 使用实例方法查询股票
     query_result = stock_name_tool.query(request.stock_code)
@@ -278,7 +273,7 @@ async def analyze_stock(request: AnalyzeRequest):
             fundamental=agent_results.get("fundamental", {}),
             macro=agent_results.get("macro", {}),
             alternative=agent_results.get("alternative", {}),
-            risk=agent_results.get("risk", {}),
+            risk=result.get("risk_assessment", {}),
             summary=result.get("summary", ""),
             risk_warnings=result.get("risk_warnings", []),
             disclaimer=result.get("disclaimer", ""),
