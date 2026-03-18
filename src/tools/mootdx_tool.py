@@ -4,6 +4,7 @@ Mootdx 数据工具
 使用 mootdx 获取 A 股历史行情数据，支持全 A 股。
 
 解决 TECH-001: 修复量化数据源 - 支持全 A 股
+优化 OPT-001: 添加缓存和连接复用
 """
 
 import os
@@ -19,6 +20,14 @@ os.environ['https_proxy'] = ''
 
 from mootdx.quotes import Quotes
 
+# 导入性能优化工具
+from ..utils.performance import (
+    timing_decorator,
+    cached,
+    get_shared_mootdx_client,
+    monitor_performance
+)
+
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -29,12 +38,18 @@ class MootdxTool:
     Mootdx 数据工具
     
     使用 mootdx 获取 A 股历史行情数据，支持全 A 股。
+    
+    优化：
+    - 连接复用：使用共享客户端
+    - 数据缓存：K线数据缓存 5 分钟
+    - 性能监控：记录执行时间
     """
     
     def __init__(self):
         """初始化工具"""
-        self.client = Quotes.factory(market='std')
-        logger.info("MootdxTool 初始化完成")
+        # 使用共享客户端（连接复用）
+        self.client = get_shared_mootdx_client()
+        logger.info("MootdxTool 初始化完成（使用共享连接）")
     
     def get_kline_data(
         self,
@@ -201,6 +216,9 @@ class MootdxTool:
         
         return df
     
+    @monitor_performance("mootdx_tool")
+    @timing_decorator
+    @cached("mootdx_analyze", max_age_seconds=300)  # 缓存 5 分钟
     def analyze(self, symbol: str) -> Dict[str, Any]:
         """
         分析股票
