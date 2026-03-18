@@ -6,5 +6,6 @@ Agents 模块
 
 from .quantitative import QuantitativeAnalyst
 from .macro import MacroAnalyst
+from .alternative import AlternativeAnalyst
 
-__all__ = ['QuantitativeAnalyst', 'MacroAnalyst']
+__all__ = ['QuantitativeAnalyst', 'MacroAnalyst', 'AlternativeAnalyst']

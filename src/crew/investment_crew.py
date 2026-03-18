@@ -19,8 +19,10 @@ os.environ.setdefault('OPENAI_API_KEY', 'sk-dummy-key-for-crewai')
 
 from crewai import Crew, Task, Agent
 
-# 导入真实的量化分析师
+# 导入真实的 Agent
 from ..agents.quantitative import QuantitativeAnalyst
+from ..agents.macro import MacroAnalyst
+from ..agents.alternative import AlternativeAnalyst
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -29,116 +31,43 @@ logger = logging.getLogger(__name__)
 
 class MacroAnalystMock:
     """
-    宏观分析师 Agent - Mock 实现
-
-    TODO: 后续替换为真实 Agent (AGENT-002)
+    宏观分析师 Agent - Mock 实现（备用）
     """
 
     def __init__(self):
         logger.info("宏观分析师 Agent (Mock) 初始化完成")
 
-    def analyze(self, stock_code: str) -> Dict[str, Any]:
-        """
-        Mock 分析宏观经济
-
-        Args:
-            stock_code: 股票代码
-
-        Returns:
-            Mock 分析结果
-        """
+    def analyze(self, stock_code: str, **kwargs) -> Dict[str, Any]:
+        """Mock 分析宏观经济"""
         logger.info(f"[Mock] 宏观分析师分析: {stock_code}")
-
         return {
             "agent": "macro_analyst",
             "stock_code": stock_code,
-            "analysis_date": datetime.now().strftime("%Y-%m-%d"),
-            "overall_rating": "中性",
+            "rating": 5,
             "confidence": 0.5,
-            "analysis": {
-                "gdp_growth": {
-                    "value": "5.2%",
-                    "trend": "平稳",
-                    "impact": "中性"
-                },
-                "inflation": {
-                    "value": "2.1%",
-                    "trend": "温和",
-                    "impact": "中性"
-                },
-                "monetary_policy": {
-                    "stance": "稳健",
-                    "impact": "中性偏多"
-                },
-                "industry_policy": {
-                    "sector": stock_code[:2],
-                    "policy": "支持发展",
-                    "impact": "正面"
-                }
-            },
-            "conclusion": "宏观经济环境整体稳定，政策面偏支持",
-            "risk_warning": [
-                "Mock 数据，仅供参考",
-                "实际宏观分析需要真实数据支持"
-            ]
+            "logic_derivation": "Mock 数据",
+            "risk_warning": "Mock 数据，仅供参考"
         }
 
 
 class AlternativeAnalystMock:
     """
-    另类分析师 Agent - Mock 实现
-
-    TODO: 后续替换为真实 Agent (AGENT-003)
+    另类分析师 Agent - Mock 实现（备用）
     """
 
     def __init__(self):
         logger.info("另类分析师 Agent (Mock) 初始化完成")
 
-    def analyze(self, stock_code: str) -> Dict[str, Any]:
-        """
-        Mock 分析另类数据
-
-        Args:
-            stock_code: 股票代码
-
-        Returns:
-            Mock 分析结果
-        """
+    def analyze(self, stock_code: str, **kwargs) -> Dict[str, Any]:
+        """Mock 分析另类数据"""
         logger.info(f"[Mock] 另类分析师分析: {stock_code}")
-
         return {
             "agent": "alternative_analyst",
             "stock_code": stock_code,
-            "analysis_date": datetime.now().strftime("%Y-%m-%d"),
-            "overall_rating": "中性偏多",
+            "rating": 6,
             "confidence": 0.6,
-            "analysis": {
-                "sentiment": {
-                    "value": "乐观",
-                    "score": 0.65,
-                    "source": "社交媒体情绪分析"
-                },
-                "news": {
-                    "positive_count": 12,
-                    "negative_count": 5,
-                    "neutral_count": 8,
-                    "sentiment": "正面"
-                },
-                "insider_trading": {
-                    "recent_activity": "无异常",
-                    "impact": "中性"
-                },
-                "institutional_flow": {
-                    "direction": "流入",
-                    "amount": "1.2亿",
-                    "impact": "正面"
-                }
-            },
-            "conclusion": "市场情绪偏乐观，机构资金流入，整体正面",
-            "risk_warning": [
-                "Mock 数据，仅供参考",
-                "实际另类分析需要真实数据支持"
-            ]
+            "logic_derivation": "Mock 数据",
+            "risk_warning": "Mock 数据，仅供参考"
         }
 
 
@@ -154,12 +83,12 @@ class InvestmentCrew:
         >>> print(result)
     """
 
-    def __init__(self, use_mock: bool = True):
+    def __init__(self, use_mock: bool = False):
         """
         初始化投资分析 Crew
 
         Args:
-            use_mock: 是否使用 Mock Agent（默认 True）
+            use_mock: 是否使用 Mock Agent（默认 False，使用真实 Agent）
         """
         # 初始化量化分析师（真实）
         self.quant_analyst = QuantitativeAnalyst()
@@ -169,22 +98,26 @@ class InvestmentCrew:
             self.macro_analyst = MacroAnalystMock()
             logger.info("使用 Mock 宏观分析师")
         else:
-            # TODO: 后续替换为真实 Agent
-            # from ..agents.macro import MacroAnalyst
-            # self.macro_analyst = MacroAnalyst()
-            logger.warning("真实宏观分析师尚未实现，使用 Mock")
-            self.macro_analyst = MacroAnalystMock()
+            # 使用真实 Agent (AGENT-002)
+            try:
+                self.macro_analyst = MacroAnalyst()
+                logger.info("使用真实宏观分析师 ✅")
+            except Exception as e:
+                logger.warning(f"宏观分析师初始化失败: {e}，使用 Mock")
+                self.macro_analyst = MacroAnalystMock()
 
         # 初始化另类分析师
         if use_mock:
             self.alternative_analyst = AlternativeAnalystMock()
             logger.info("使用 Mock 另类分析师")
         else:
-            # TODO: 后续替换为真实 Agent
-            # from ..agents.alternative import AlternativeAnalyst
-            # self.alternative_analyst = AlternativeAnalyst()
-            logger.warning("真实另类分析师尚未实现，使用 Mock")
-            self.alternative_analyst = AlternativeAnalystMock()
+            # 使用真实 Agent (AGENT-003)
+            try:
+                self.alternative_analyst = AlternativeAnalyst()
+                logger.info("使用真实另类分析师 ✅")
+            except Exception as e:
+                logger.warning(f"另类分析师初始化失败: {e}，使用 Mock")
+                self.alternative_analyst = AlternativeAnalystMock()
 
         logger.info("投资分析 Crew 初始化完成")
 
