@@ -219,9 +219,13 @@ function displayResults(data) {
     document.getElementById('analysisDate').textContent = data.analysis_date;
     
     // Agent 结果
-    displayAgentResult('quantitativeResult', data.quantitative);
-    displayAgentResult('macroResult', data.macro);
-    displayAgentResult('alternativeResult', data.alternative);
+    const results = data.agent_results || {};
+    displayAgentResult('quantitativeResult', results.quantitative);
+    displayAgentResult('fundamentalResult', results.fundamental);
+    displayAgentResult('macroResult', results.macro);
+    displayAgentResult('alternativeResult', results.alternative);
+    displayAgentResult('riskResult', data.risk_assessment);
+    displayAgentResult('decisionResult', data.final_decision);
     
     // 投资建议
     document.getElementById('summary').innerHTML = formatText(data.summary || '暂无投资建议');
