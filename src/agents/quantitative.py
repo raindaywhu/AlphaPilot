@@ -67,12 +67,9 @@ class QuantitativeAnalyst:
         )
 
         # 初始化工具
-<<<<<<< HEAD
         self.alpha158_tool = Alpha158Tool()
-        self.mootdx_tool = MootdxTool()  # 新增：全 A 股数据工具
-=======
+        self.mootdx_tool = MootdxTool()  # 全 A 股数据工具
         self.tech_tool = TechnicalIndicatorsTool()
->>>>>>> 8464d64a27bd45649e7ad53037c1a2f5e816a754
 
         # 创建 CrewAI Agent
         self.agent = self._create_agent()
@@ -170,7 +167,6 @@ class QuantitativeAnalyst:
         """
         logger.info(f"开始分析股票: {stock_code}")
 
-<<<<<<< HEAD
         # 优先使用 MootdxTool（支持全 A 股）
         try:
             logger.info(f"使用 MootdxTool 获取数据...")
@@ -217,9 +213,7 @@ class QuantitativeAnalyst:
 
         # 回退到 Alpha158Tool（仅支持 csi300）
         # 获取 Alpha158 因子数据
-=======
         # 获取技术指标数据
->>>>>>> 8464d64a27bd45649e7ad53037c1a2f5e816a754
         try:
             tech_indicators = self.tech_tool.get_indicators(stock_code)
             logger.info(f"成功获取股票 {stock_code} 的技术指标数据")
