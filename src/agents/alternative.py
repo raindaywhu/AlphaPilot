@@ -255,6 +255,22 @@ class AlternativeAnalyst:
             result.setdefault("commodity_analysis", "数据不足")
             result.setdefault("sentiment_analysis", "数据不足")
             result.setdefault("risk_warning", "数据有限，需谨慎决策")
+            
+            # 添加 overall_rating 和 conclusion 字段（InvestmentCrew 需要）
+            rating = result.get("rating", 5)
+            if rating >= 8:
+                result["overall_rating"] = "看涨"
+            elif rating >= 6:
+                result["overall_rating"] = "中性偏多"
+            elif rating >= 4:
+                result["overall_rating"] = "中性"
+            elif rating >= 2:
+                result["overall_rating"] = "中性偏空"
+            else:
+                result["overall_rating"] = "看跌"
+            
+            # 生成结论
+            result["conclusion"] = result.get("logic_derivation", "另类数据分析完成")
 
             logger.info(f"分析完成，评级: {result['rating']}, 置信度: {result['confidence']}")
 

@@ -235,6 +235,9 @@ class MacroAnalyst:
         macro_view, confidence = self._calculate_overall_view(result)
         result["macro_view"] = macro_view
         result["confidence"] = confidence
+        
+        # 添加 overall_rating 字段（InvestmentCrew 需要）
+        result["overall_rating"] = macro_view
 
         # 5. 生成结论
         result["conclusion"] = self._generate_conclusion(result)
