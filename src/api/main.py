@@ -204,16 +204,6 @@ async def analyze_stock(request: AnalyzeRequest):
     - **parallel**: 是否并行分析（默认 True）
     - **time_horizon**: 预测周期（天）
     """
-    # 查询股票信息（支持名称或代码）
-    stock_info = StockNameQueryTool.lookup(request.stock_code)
-    if not stock_info:
-        raise HTTPException(status_code=400, detail=f"无法识别股票: {request.stock_code}")
-    
-    stock_code = stock_info["code"]
-    stock_name = stock_info["name"]
-    
-    logger.info(f"开始分析股票: {stock_name} ({stock_code})")
-    
     try:
         # 支持股票名称输入，自动转换为代码
         stock_code = request.stock_code
