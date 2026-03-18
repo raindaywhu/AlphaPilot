@@ -12,7 +12,9 @@ from typing import List, Optional, Union
 from datetime import datetime
 
 import pandas as pd
-import qlib
+
+# 使用 qlib 单例管理器，避免多线程重复初始化
+from ..utils.qlib_manager import ensure_qlib_initialized
 from qlib.contrib.data.handler import Alpha158
 
 # 配置日志
@@ -50,12 +52,8 @@ class Alpha158Tool:
         self._initialized = False
 
     def _ensure_qlib_initialized(self):
-        """确保 qlib 已初始化"""
-        if not self._initialized:
-            logger.info(f"初始化 qlib, provider: {self.qlib_provider}")
-            qlib.init(provider_uri=self.qlib_provider)
-            self._initialized = True
-            logger.info("qlib 初始化成功")
+        """确保 qlib 已初始化（使用单例管理器，线程安全）"""
+        ensure_qlib_initialized(self.qlib_provider)
 
     def get_factors(
         self,

@@ -13,7 +13,9 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 import numpy as np
-import qlib
+
+# 使用 qlib 单例管理器，避免多线程重复初始化
+from ..utils.qlib_manager import ensure_qlib_initialized
 from qlib.contrib.model.gbdt import LGBModel
 from qlib.contrib.data.handler import Alpha158
 from qlib.data.dataset import DatasetH
@@ -56,16 +58,13 @@ class QlibGBDTPredictionTool:
         self._dataset = None
 
     def _ensure_initialized(self):
-        """确保 qlib 和模型已初始化"""
-        if not self._initialized:
-            logger.info(f"初始化 qlib, provider: {self.qlib_provider}")
-            qlib.init(provider_uri=self.qlib_provider)
-            
-            # 初始化模型
+        """确保 qlib 和模型已初始化（使用单例管理器，线程安全）"""
+        ensure_qlib_initialized(self.qlib_provider)
+        
+        # 初始化模型（只初始化一次）
+        if self._model is None:
             self._init_model()
-            
-            self._initialized = True
-            logger.info("GBDT 工具初始化成功")
+            logger.info("GBDT 模型初始化成功")
 
     def _init_model(self):
         """初始化 GBDT 模型"""

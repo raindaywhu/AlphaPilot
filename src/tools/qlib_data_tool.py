@@ -16,7 +16,8 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 
-import qlib
+# 使用 qlib 单例管理器，避免多线程重复初始化
+from ..utils.qlib_manager import ensure_qlib_initialized
 from qlib.data import D
 from qlib.data.dataset import DatasetH
 
@@ -74,15 +75,8 @@ class QlibDataTool:
         logger.info(f"QlibDataTool 初始化: {provider_uri}")
     
     def _ensure_initialized(self):
-        """确保 qlib 已初始化"""
-        if not self._initialized:
-            try:
-                qlib.init(provider_uri=self.provider_uri)
-                self._initialized = True
-                logger.info("qlib 初始化成功")
-            except Exception as e:
-                logger.error(f"qlib 初始化失败: {e}")
-                raise
+        """确保 qlib 已初始化（使用单例管理器，线程安全）"""
+        ensure_qlib_initialized(self.provider_uri)
     
     def get_kline_data(
         self,
