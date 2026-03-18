@@ -39,3 +39,4 @@ Thumbs.db
 .qlib/
 *.log
 .envmlruns/
+.chromadb/
