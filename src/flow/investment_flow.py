@@ -153,7 +153,7 @@ class InvestmentAnalysisFlow:
         
         # 检查 qlib 数据
         try:
-            data = self.data_tool.get_stock_data(stock_code, days=30)
+            data = self.data_tool.get_kline_data(stock_code, days=30)
             if data is not None and len(data) > 0:
                 self.state["data_ready"] = True
                 logger.info(f"数据准备完成，获取到 {len(data)} 天数据")
@@ -218,10 +218,9 @@ class InvestmentAnalysisFlow:
         """
         logger.info("[阶段3] 风险评估")
         
-        # 传入分析结果
+        # 风险分析
         self.state["risk_assessment"] = self.risk_manager.analyze(
-            stock_code=self.state["stock_code"],
-            analysis_results=self.state["analysis_results"]
+            stock_code=self.state["stock_code"]
         )
         
         logger.info("风险评估完成")
@@ -234,10 +233,14 @@ class InvestmentAnalysisFlow:
         """
         logger.info("[阶段4] 综合决策")
         
-        # 传入分析结果和风险评估
+        # 传入各分析结果
+        agent_results = self.state["analysis_results"]
         self.state["final_decision"] = self.decision_maker.analyze(
             stock_code=self.state["stock_code"],
-            analysis_results=self.state["analysis_results"],
+            quant_analysis=agent_results.get("quantitative"),
+            fundamental_analysis=agent_results.get("fundamental"),
+            macro_analysis=agent_results.get("macro"),
+            alternative_analysis=agent_results.get("alternative"),
             risk_assessment=self.state["risk_assessment"]
         )
         
