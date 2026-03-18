@@ -14,7 +14,7 @@ from .web_search import WebSearchTool
 from .industry_compare import IndustryCompareTool
 from .sentiment_analysis import SentimentAnalysisTool
 from .macro_data import MacroDataTool
-from .stock_lookup import StockLookupTool, lookup_stock, search_stocks
+from .stock_name_query_tool import StockNameQueryTool
 
 __all__ = [
     'Alpha158Tool',
@@ -27,7 +27,5 @@ __all__ = [
     'IndustryCompareTool',
     'SentimentAnalysisTool',
     'MacroDataTool',
-    'StockLookupTool',
-    'lookup_stock',
-    'search_stocks'
+    'StockNameQueryTool'
 ]

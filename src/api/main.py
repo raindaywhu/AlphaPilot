@@ -3,7 +3,7 @@ AlphaPilot API - 分析接口
 
 提供股票分析 REST API + Web UI
 
-Issue: #20 (API-001), #21 (UI-001), #32 (UI-002)
+Issue: #20 (API-001), #21 (UI-001), #32 (UI-002), #38 (名称查询)
 """
 
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
@@ -24,7 +24,11 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from src.flow.investment_flow import InvestmentAnalysisFlow
-from src.tools.stock_lookup import StockLookupTool
+<<<<<<< HEAD
+from src.tools.stock_name_query_tool import StockNameQueryTool
+=======
+from src.tools.stock_name_query_tool import StockNameQueryTool
+>>>>>>> b020bdf (feat: Web UI 支持股票名称输入 (#38))
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -51,14 +55,41 @@ WEB_DIR = Path(__file__).parent.parent / "web"
 if WEB_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
+# 初始化股票名称查询工具
+stock_name_tool = StockNameQueryTool()
+
 
 # ============== 数据模型 ==============
 
 class AnalyzeRequest(BaseModel):
     """股票分析请求"""
+<<<<<<< HEAD
     stock_code: str = Field(..., description="股票代码或名称，如 SH600519 或 贵州茅台", example="贵州茅台")
+=======
+    stock_code: str = Field(..., description="股票代码或名称，如 SH600519 或 贵州茅台", example="SH600519")
+>>>>>>> b020bdf (feat: Web UI 支持股票名称输入 (#38))
     parallel: bool = Field(True, description="是否并行分析")
     time_horizon: int = Field(5, description="预测周期（天）", ge=1, le=30)
+
+
+class StockQueryResponse(BaseModel):
+    """股票查询响应"""
+    success: bool
+    code: str = ""
+    name: str = ""
+    market: str = ""
+    full_code: str = ""
+    match_type: str = ""
+    confidence: float = 0.0
+    other_matches: List[str] = Field(default_factory=list)
+    suggestions: List[str] = Field(default_factory=list)
+    error: str = ""
+
+
+class StockSearchResponse(BaseModel):
+    """股票搜索响应"""
+    keyword: str
+    results: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class AnalyzeResponse(BaseModel):
@@ -118,6 +149,58 @@ async def health_check():
     )
 
 
+@app.get("/api/stock/query", response_model=StockQueryResponse, tags=["股票"])
+async def query_stock(name_or_code: str):
+    """
+    股票名称/代码查询接口
+    
+    支持股票名称、简称、代码的查询，支持模糊匹配
+    
+    - **name_or_code**: 股票名称或代码，如 "贵州茅台"、"茅台"、"600519"、"SH600519"
+    """
+    logger.info(f"查询股票: {name_or_code}")
+    
+    result = stock_name_tool.query(name_or_code)
+    
+    if result['success']:
+        return StockQueryResponse(
+            success=True,
+            code=result['code'],
+            name=result['name'],
+            market=result['market'],
+            full_code=result['full_code'],
+            match_type=result['match_type'],
+            confidence=result.get('confidence', 1.0),
+            other_matches=result.get('other_matches', [])
+        )
+    else:
+        return StockQueryResponse(
+            success=False,
+            error=result['error'],
+            suggestions=result.get('suggestions', [])
+        )
+
+
+@app.get("/api/stock/search", response_model=StockSearchResponse, tags=["股票"])
+async def search_stocks(keyword: str, limit: int = 10):
+    """
+    股票搜索接口
+    
+    搜索包含关键词的股票
+    
+    - **keyword**: 搜索关键词
+    - **limit**: 返回数量限制（默认10）
+    """
+    logger.info(f"搜索股票: {keyword}")
+    
+    results = stock_name_tool.search(keyword, limit)
+    
+    return StockSearchResponse(
+        keyword=keyword,
+        results=results
+    )
+
+
 @app.post("/api/analyze", response_model=AnalyzeResponse, tags=["分析"])
 async def analyze_stock(request: AnalyzeRequest):
     """
@@ -125,12 +208,16 @@ async def analyze_stock(request: AnalyzeRequest):
     
     执行量化、基本面、宏观、另类、风控五维分析
     
+<<<<<<< HEAD
     - **stock_code**: 股票代码或名称，如 SH600519 或 贵州茅台
+=======
+    - **stock_code**: 股票代码或名称，如 SH600519、贵州茅台、茅台
+>>>>>>> b020bdf (feat: Web UI 支持股票名称输入 (#38))
     - **parallel**: 是否并行分析（默认 True）
     - **time_horizon**: 预测周期（天）
     """
     # 查询股票信息（支持名称或代码）
-    stock_info = StockLookupTool.lookup(request.stock_code)
+    stock_info = StockNameQueryTool.lookup(request.stock_code)
     if not stock_info:
         raise HTTPException(status_code=400, detail=f"无法识别股票: {request.stock_code}")
     
@@ -140,12 +227,29 @@ async def analyze_stock(request: AnalyzeRequest):
     logger.info(f"开始分析股票: {stock_name} ({stock_code})")
     
     try:
+        # 支持股票名称输入，自动转换为代码
+        stock_code = request.stock_code
+        stock_name = ""
+        
+        # 检查是否为名称输入（非纯代码格式）
+        if not re.match(r'^(SH|SZ)?\d{6}$', stock_code.upper()):
+            query_result = stock_name_tool.query(stock_code)
+            if query_result['success']:
+                stock_code = query_result['full_code']
+                stock_name = query_result['name']
+                logger.info(f"股票名称转换: {request.stock_code} -> {stock_code} ({stock_name})")
+            else:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"无法识别股票: {request.stock_code}。建议: {query_result.get('suggestions', [])}"
+                )
+        
         # 初始化 Flow（使用工作流编排）
         flow = InvestmentAnalysisFlow(use_mock=False)
         
         # 执行分析
         result = flow.run(
-            stock_code=request.stock_code,
+            stock_code=stock_code,
             parallel=request.parallel
         )
         
