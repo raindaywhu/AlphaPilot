@@ -122,14 +122,12 @@ class QlibDataUpdater:
             success_count = 0
             for i, code in enumerate(stock_codes):
                 try:
-                    # 获取历史数据
-                    df = self.data_fetcher.stock_zh_a_hist(
-                        symbol=code, 
-                        period="daily",
-                        start_date="20200101",
-                        end_date=datetime.now().strftime("%Y%m%d"),
-                        adjust="qfq"  # 前复权
-                    )
+                    # 处理股票代码格式
+                    # stock_zh_a_daily 需要小写的 sh/sz 前缀（如 sh600519）
+                    symbol = code.lower() if code.upper().startswith(('SH', 'SZ')) else f'sh{code}'
+                    
+                    # 获取历史数据（使用 stock_zh_a_daily 接口）
+                    df = self.data_fetcher.stock_zh_a_daily(symbol=symbol)
                     
                     if df is not None and len(df) > 0:
                         # 保存为 qlib 格式
@@ -232,29 +230,19 @@ class QlibDataUpdater:
             save_dir = self.qlib_data_dir / "features" / stock_code
             save_dir.mkdir(parents=True, exist_ok=True)
             
-            # 标准化列名
-            column_mapping = {
-                '日期': 'date',
-                '开盘': 'open',
-                '收盘': 'close',
-                '最高': 'high',
-                '最低': 'low',
-                '成交量': 'volume',
-                '成交额': 'amount',
-                '振幅': 'amplitude',
-                '涨跌幅': 'pct_change',
-                '涨跌额': 'change',
-                '换手率': 'turnover'
-            }
-            
-            df = df.rename(columns=column_mapping)
-            
-            # 确保必要的列存在
+            # 标准化列名（stock_zh_a_daily 返回的列名）
+            # 列名: date, open, close, high, low, volume, amount, outstanding_share, turnover
+            # 已经是英文格式，只需要选择需要的列
             required_columns = ['date', 'open', 'close', 'high', 'low', 'volume']
+            
+            # 检查必要的列是否存在
             for col in required_columns:
                 if col not in df.columns:
                     logger.warning(f"缺少列: {col}")
                     return False
+            
+            # 只保留需要的列
+            df = df[required_columns].copy()
             
             # 保存为 CSV（qlib 会自动转换）
             save_path = save_dir / f"{stock_code}.csv"
@@ -369,7 +357,7 @@ if __name__ == "__main__":
     print("=" * 50)
     
     # 创建更新器
-    updater = QlibDataUpdater(data_source="mootdx")  # 使用 mootdx（因为 akshare 网络问题）
+    updater = QlibDataUpdater(data_source="akshare")  # 使用 akshare（东方财富接口可用）
     
     # 获取数据状态
     status = updater.get_data_status()
