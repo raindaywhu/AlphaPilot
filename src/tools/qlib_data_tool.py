@@ -207,24 +207,30 @@ class QlibDataTool:
             # 转换为 DataFrame
             df = pd.DataFrame(bars)
             
-            # 重命名列
-            df = df.rename(columns={
-                'open': 'open',
-                'close': 'close',
-                'high': 'high',
-                'low': 'low',
-                'vol': 'volume'
-            })
+            # 处理 datetime 列
+            if 'datetime' in df.columns:
+                df['datetime'] = pd.to_datetime(df['datetime'])
+            else:
+                # 使用索引作为 datetime
+                df = df.reset_index(drop=True)
+                df['datetime'] = pd.date_range(end=datetime.now(), periods=len(df), freq='D')
             
-            # 添加日期列
-            if 'datetime' not in df.columns:
-                df['datetime'] = pd.to_datetime(df.index)
+            # 确保列名正确
+            column_mapping = {}
+            if 'vol' in df.columns:
+                column_mapping['vol'] = 'volume'
+            df = df.rename(columns=column_mapping)
+            
+            # 选择需要的列
+            required_cols = ['datetime', 'open', 'close', 'high', 'low', 'volume']
+            available_cols = [c for c in required_cols if c in df.columns]
+            df = df[available_cols]
             
             # 按日期排序
             df = df.sort_values('datetime').tail(days)
             
             logger.info(f"从 mootdx 获取 {symbol} 的数据: {len(df)} 条")
-            return df[['datetime', 'open', 'close', 'high', 'low', 'volume']]
+            return df
             
         except Exception as e:
             logger.error(f"mootdx 获取数据失败: {e}")
