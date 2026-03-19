@@ -42,7 +42,7 @@ class AlternativeAnalyst:
         self,
         llm_model: str = "glm-5",
         llm_api_base: str = "https://coding.dashscope.aliyuncs.com/v1",
-        llm_api_key: str = "os.environ.get("GLM_API_KEY", "")",
+        llm_api_key: str = os.environ.get("GLM_API_KEY", ""),
         llm_temperature: float = 0.3
     ):
         """
@@ -408,7 +408,9 @@ class AlternativeAnalyst:
                         result[name] = {
                             "symbol": symbol,
                             "exchange": row.iloc[0].get('exchange', ''),
-                            "name": row.iloc[0].get('name', name)
+                            "name": row.iloc[0].get('name', name),
+                            "price": row.iloc[0].get('最新价', row.iloc[0].get('close', 'N/A')),
+                            "change_pct": row.iloc[0].get('涨跌幅', 'N/A')
                         }
                 except:
                     pass
@@ -442,6 +444,14 @@ class AlternativeAnalyst:
             "market_sentiment": "中性",
             "indices": {}
         }
+        
+        # 临时禁用代理（akshare 的东方财富 API 不支持代理）
+        import os
+        old_proxy = {}
+        for key in ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY']:
+            old_proxy[key] = os.environ.get(key)
+            if key in os.environ:
+                del os.environ[key]
         
         # 重试机制
         max_retries = 3
@@ -481,6 +491,10 @@ class AlternativeAnalyst:
                 
                 result["avg_change_pct"] = round(avg_change, 2)
                 
+                # 恢复代理设置
+                for key, value in old_proxy.items():
+                    if value:
+                        os.environ[key] = value
                 return result
                 
             except Exception as e:
@@ -490,6 +504,11 @@ class AlternativeAnalyst:
                     time.sleep(1)  # 等待 1 秒后重试
                 else:
                     logger.error(f"获取市场情绪数据最终失败: {e}")
+        
+        # 恢复代理设置
+        for key, value in old_proxy.items():
+            if value:
+                os.environ[key] = value
         
         # 所有重试都失败，返回默认值
         result["error"] = "无法获取市场情绪数据（已重试）"
