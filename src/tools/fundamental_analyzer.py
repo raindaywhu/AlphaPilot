@@ -70,64 +70,119 @@ class FundamentalAnalyzer:
     
     def _get_financial_data(self, stock_code: str) -> Dict[str, Any]:
         """
-        获取财务数据 - 使用 mootdx 获取真实数据
+        获取财务数据 - 使用 AKShare 获取真实数据
         """
         logger.info(f"获取财务数据: {stock_code}")
-        
+
         try:
-            # 使用 mootdx 获取财务数据
-            from mootdx.quotes import Quotes
-            
-            client = Quotes.factory(market='std')
-            
+            # 使用 AKShare 获取财务数据（更可靠）
+            import akshare as ak
+
             # 标准化股票代码（去掉前缀）
             code = stock_code.replace('SH', '').replace('SZ', '').replace('sh', '').replace('sz', '')
-            
-            # 获取财务数据
+
+            # 获取财务摘要
+            df = ak.stock_financial_abstract(symbol=code)
+
+            if df is not None and not df.empty:
+                # 获取最新一期数据列（第3列，即 20250930）
+                latest_col = df.columns[2]  # 跳过 '选项' 和 '指标' 列
+
+                # 提取关键财务指标的函数
+                def get_value(indicator_name):
+                    row = df[df['指标'] == indicator_name]
+                    if not row.empty:
+                        val = row[latest_col].values[0]
+                        # 处理数值
+                        if pd.isna(val):
+                            return None
+                        try:
+                            return float(val)
+                        except (ValueError, TypeError):
+                            return None
+                    return None
+
+                import pandas as pd
+
+                # 获取财务数据
+                bps = get_value('每股净资产')
+                roe = get_value('净资产收益率(ROE)')
+                eps = get_value('基本每股收益')
+                net_profit_margin = get_value('销售净利率')
+                debt_ratio = get_value('资产负债率')
+
+                # ROE 和 debt_ratio 是百分比，需要转换
+                if roe is not None:
+                    roe = roe / 100
+                if debt_ratio is not None:
+                    debt_ratio = debt_ratio / 100
+                if net_profit_margin is not None:
+                    net_profit_margin = net_profit_margin / 100
+
+                # 如果关键数据都有，返回
+                if bps is not None:
+                    logger.info(f"从 AKShare 获取真实财务数据: BPS={bps:.2f}, ROE={roe:.2%}, EPS={eps:.2f}")
+
+                    return {
+                        "pe_ratio": 0.0,  # 需要股价计算
+                        "pb_ratio": 0.0,  # 需要股价计算
+                        "roe": round(roe, 4) if roe else 0,
+                        "net_profit_margin": round(net_profit_margin, 4) if net_profit_margin else 0.1,
+                        "debt_ratio": round(debt_ratio, 4) if debt_ratio else 0.5,
+                        "current_ratio": 1.5,  # 需要其他接口
+                        "revenue_growth": 0.1,  # 需要历史数据
+                        "profit_growth": 0.1,
+                        "dividend_yield": 0.03,
+                        "eps": round(eps, 2) if eps else 0,
+                        "bps": round(bps, 2),
+                        "data_source": "akshare"
+                    }
+        except Exception as e:
+            logger.warning(f"AKShare 获取财务数据失败: {e}，尝试使用 mootdx")
+
+        # 回退到 mootdx
+        try:
+            from mootdx.quotes import Quotes
+
+            client = Quotes.factory(market='std')
+            code = stock_code.replace('SH', '').replace('SZ', '').replace('sh', '').replace('sz', '')
+
             finance_data = client.finance(code=code)
-            
+
             if finance_data is not None and not finance_data.empty:
                 row = finance_data.iloc[0]
-                
-                # 提取关键字段
-                bps = row.get('meigujingzichan', 0)  # 每股净资产
-                net_assets = row.get('jingzichan', 0)  # 净资产
-                net_profit = row.get('jinglirun', 0)  # 净利润
-                total_assets = row.get('zongzichan', 0)  # 总资产
-                revenue = row.get('zhuyingshouru', 0)  # 主营收入
-                
-                # 获取实时价格计算 PE/PB
-                quote = client.quotes(code=code)
-                price = quote.iloc[0].get('price', 0) if quote is not None and not quote.empty else 0
-                
-                # 计算财务指标
-                eps = net_profit / (row.get('liutongguben', 1) / 10) if row.get('liutongguben', 0) > 0 else 0
-                pe_ratio = price / eps if eps > 0 else 0
-                pb_ratio = price / bps if bps > 0 else 0
+
+                bps = row.get('meigujingzichan', 0)
+                net_assets = row.get('jingzichan', 0)
+                net_profit = row.get('jinglirun', 0)
+                total_assets = row.get('zongzichan', 0)
+                revenue = row.get('zhuyingshouru', 0)
+
                 roe = net_profit / net_assets if net_assets > 0 else 0
                 net_profit_margin = net_profit / revenue if revenue > 0 else 0
                 debt_ratio = (total_assets - net_assets) / total_assets if total_assets > 0 else 0
-                
-                logger.info(f"从 mootdx 获取真实财务数据: PE={pe_ratio:.2f}, PB={pb_ratio:.2f}, ROE={roe:.2%}")
-                
+
+                logger.info(f"从 mootdx 获取财务数据: BPS={bps:.2f}, ROE={roe:.2%}")
+
                 return {
-                    "pe_ratio": round(pe_ratio, 2),
-                    "pb_ratio": round(pb_ratio, 2),
+                    "pe_ratio": 0.0,
+                    "pb_ratio": 0.0,
                     "roe": round(roe, 4),
                     "net_profit_margin": round(net_profit_margin, 4),
                     "debt_ratio": round(debt_ratio, 4),
-                    "current_ratio": 1.5,  # 需要其他接口
-                    "revenue_growth": 0.1,  # 需要历史数据
+                    "current_ratio": 1.5,
+                    "revenue_growth": 0.1,
                     "profit_growth": 0.1,
                     "dividend_yield": 0.03,
-                    "eps": round(eps, 2),
+                    "eps": 0,
                     "bps": round(bps, 2),
                     "data_source": "mootdx"
                 }
         except Exception as e:
-            logger.warning(f"mootdx 获取财务数据失败: {e}，使用默认值")
-        
-        # 回退默认值
+            logger.error(f"mootdx 也失败: {e}")
+
+        # 最终回退默认值
+        logger.warning(f"所有数据源都失败，使用默认值")
         return {
             "pe_ratio": 15.0,
             "pb_ratio": 2.0,
