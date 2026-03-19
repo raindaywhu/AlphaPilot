@@ -223,18 +223,18 @@ async def analyze_stock(request: AnalyzeRequest):
         stock_code = request.stock_code
         stock_name = ""
         
-        # 检查是否为名称输入（非纯代码格式）
-        if not re.match(r'^(SH|SZ)?\d{6}$', stock_code.upper()):
-            query_result = stock_name_tool.query(stock_code)
-            if query_result['success']:
-                stock_code = query_result['full_code']
-                stock_name = query_result['name']
-                logger.info(f"股票名称转换: {request.stock_code} -> {stock_code} ({stock_name})")
-            else:
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"无法识别股票: {request.stock_code}。建议: {query_result.get('suggestions', [])}"
-                )
+        # 统一验证股票是否存在（不管是名称还是代码格式）
+        query_result = stock_name_tool.query(stock_code)
+        if query_result['success']:
+            stock_code = query_result['full_code']
+            stock_name = query_result['name']
+            logger.info(f"股票验证通过: {request.stock_code} -> {stock_code} ({stock_name})")
+        else:
+            # 股票不存在，返回友好错误
+            raise HTTPException(
+                status_code=400, 
+                detail=f"无法识别股票: {request.stock_code}。建议: {query_result.get('suggestions', [])}"
+            )
         
         # 初始化 Flow（使用工作流编排）
         flow = InvestmentAnalysisFlow()
