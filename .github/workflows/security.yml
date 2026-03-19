@@ -1,0 +1,49 @@
+name: Security Check
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  detect-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Detect API Keys
+        run: |
+          echo "🔍 检查敏感信息泄露..."
+          
+          # 检测 API Key 模式
+          PATTERNS=(
+            'sk-[a-zA-Z0-9]{20,}'
+            'sk-sp-[a-zA-Z0-9]{20,}'
+            'ghp_[a-zA-Z0-9]{36}'
+            'AKIA[0-9A-Z]{16}'
+          )
+          
+          FOUND=0
+          for PATTERN in "${PATTERNS[@]}"; do
+            if git grep -E "$PATTERN" -- '*.py' '*.js' '*.ts' '*.json' '*.yaml' '*.yml' '*.env.example'; then
+              FOUND=1
+            fi
+          done
+          
+          if [ $FOUND -eq 1 ]; then
+            echo "🚫 发现敏感信息泄露！"
+            exit 1
+          fi
+          
+          echo "✅ 无敏感信息泄露"
+      
+      - name: Check .env not tracked
+        run: |
+          if git ls-files | grep -q '\.env$'; then
+            echo "🚫 .env 文件被追踪！"
+            exit 1
+          fi
+          echo "✅ .env 未被追踪"

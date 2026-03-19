@@ -1,4 +1,13 @@
-# Python
+# ========== 敏感信息（绝对禁止提交）==========
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# ========== Python ==========
 __pycache__/
 *.py[cod]
 *$py.class
@@ -38,9 +47,6 @@ Thumbs.db
 # Project specific
 .qlib/
 *.log
-.env
-.env.*
-!.env.example
 .envmlruns/
 .chromadb/
 
