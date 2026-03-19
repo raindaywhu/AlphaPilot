@@ -38,6 +38,9 @@ Thumbs.db
 # Project specific
 .qlib/
 *.log
+.env
+.env.*
+!.env.example
 .envmlruns/
 .chromadb/
 
