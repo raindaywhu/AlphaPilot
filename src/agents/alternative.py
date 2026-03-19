@@ -526,13 +526,7 @@ class AlternativeAnalyst:
         
         try:
             # 腾讯财经指数接口
-            indices_map = {
-                "上证指数": "sh000001",
-                "深证成指": "sz399001", 
-                "创业板指": "sz399006"
-            }
-            
-            codes = list(indices_map.values())
+            codes = ["sh000001", "sz399001", "sz399006"]  # 上证、深证、创业板
             url = f"http://qt.gtimg.cn/q={','.join(codes)}"
             
             resp = requests.get(url, timeout=10)
@@ -543,20 +537,17 @@ class AlternativeAnalyst:
                         continue
                     parts = line.split('~')
                     if len(parts) >= 33:
-                        # 解析代码
-                        code_part = parts[0].split('=')[0].replace('v_', '')
-                        # 找到对应的指数名称
-                        for name, tc in indices_map.items():
-                            if tc in code_part.lower():
-                                current = float(parts[3])
-                                change = float(parts[31])
-                                pct = float(parts[32])
-                                result["indices"][name] = {
-                                    "price": current,
-                                    "change": change,
-                                    "change_pct": round(pct, 2)
-                                }
-                                break
+                        # 腾讯 API 直接返回指数名称
+                        name = parts[1]  # 指数名称
+                        current = float(parts[3])
+                        change = float(parts[31])
+                        pct = float(parts[32])
+                        result["indices"][name] = {
+                            "name": name,
+                            "price": current,
+                            "change": change,
+                            "change_pct": round(pct, 2)
+                        }
             
             # 计算市场情绪
             if result["indices"]:
