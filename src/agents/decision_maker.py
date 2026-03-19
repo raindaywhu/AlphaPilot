@@ -40,7 +40,7 @@ class DecisionMaker:
         self,
         llm_model: str = "glm-5",
         llm_api_base: str = "https://coding.dashscope.aliyuncs.com/v1",
-        llm_api_key: str = "os.environ.get("GLM_API_KEY", "")",
+        llm_api_key: str = os.environ.get("GLM_API_KEY", ""),
         llm_temperature: float = 0.3
     ):
         """
