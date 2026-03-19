@@ -70,27 +70,77 @@ class FundamentalAnalyzer:
     
     def _get_financial_data(self, stock_code: str) -> Dict[str, Any]:
         """
-        获取财务数据
-        
-        注：实际应调用 akshare 或其他数据源
-        当前使用模拟数据演示
+        获取财务数据 - 使用 mootdx 获取真实数据
         """
         logger.info(f"获取财务数据: {stock_code}")
         
-        # 模拟财务数据
-        # 实际应使用 akshare.stock_financial_analysis_indicator 等接口
+        try:
+            # 使用 mootdx 获取财务数据
+            from mootdx.quotes import Quotes
+            
+            client = Quotes.factory(market='std')
+            
+            # 标准化股票代码（去掉前缀）
+            code = stock_code.replace('SH', '').replace('SZ', '').replace('sh', '').replace('sz', '')
+            
+            # 获取财务数据
+            finance_data = client.finance(code=code)
+            
+            if finance_data is not None and not finance_data.empty:
+                row = finance_data.iloc[0]
+                
+                # 提取关键字段
+                bps = row.get('meigujingzichan', 0)  # 每股净资产
+                net_assets = row.get('jingzichan', 0)  # 净资产
+                net_profit = row.get('jinglirun', 0)  # 净利润
+                total_assets = row.get('zongzichan', 0)  # 总资产
+                revenue = row.get('zhuyingshouru', 0)  # 主营收入
+                
+                # 获取实时价格计算 PE/PB
+                quote = client.quotes(code=code)
+                price = quote.iloc[0].get('price', 0) if quote is not None and not quote.empty else 0
+                
+                # 计算财务指标
+                eps = net_profit / (row.get('liutongguben', 1) / 10) if row.get('liutongguben', 0) > 0 else 0
+                pe_ratio = price / eps if eps > 0 else 0
+                pb_ratio = price / bps if bps > 0 else 0
+                roe = net_profit / net_assets if net_assets > 0 else 0
+                net_profit_margin = net_profit / revenue if revenue > 0 else 0
+                debt_ratio = (total_assets - net_assets) / total_assets if total_assets > 0 else 0
+                
+                logger.info(f"从 mootdx 获取真实财务数据: PE={pe_ratio:.2f}, PB={pb_ratio:.2f}, ROE={roe:.2%}")
+                
+                return {
+                    "pe_ratio": round(pe_ratio, 2),
+                    "pb_ratio": round(pb_ratio, 2),
+                    "roe": round(roe, 4),
+                    "net_profit_margin": round(net_profit_margin, 4),
+                    "debt_ratio": round(debt_ratio, 4),
+                    "current_ratio": 1.5,  # 需要其他接口
+                    "revenue_growth": 0.1,  # 需要历史数据
+                    "profit_growth": 0.1,
+                    "dividend_yield": 0.03,
+                    "eps": round(eps, 2),
+                    "bps": round(bps, 2),
+                    "data_source": "mootdx"
+                }
+        except Exception as e:
+            logger.warning(f"mootdx 获取财务数据失败: {e}，使用默认值")
+        
+        # 回退默认值
         return {
-            "pe_ratio": 15.5,           # 市盈率
-            "pb_ratio": 2.3,            # 市净率
-            "roe": 0.18,                # 净资产收益率
-            "net_profit_margin": 0.25,  # 净利率
-            "debt_ratio": 0.35,         # 资产负债率
-            "current_ratio": 1.8,       # 流动比率
-            "revenue_growth": 0.12,     # 营收增长率
-            "profit_growth": 0.15,      # 利润增长率
-            "dividend_yield": 0.025,    # 股息率
-            "eps": 3.2,                 # 每股收益
-            "bps": 12.5                 # 每股净资产
+            "pe_ratio": 15.0,
+            "pb_ratio": 2.0,
+            "roe": 0.10,
+            "net_profit_margin": 0.15,
+            "debt_ratio": 0.40,
+            "current_ratio": 1.5,
+            "revenue_growth": 0.05,
+            "profit_growth": 0.05,
+            "dividend_yield": 0.02,
+            "eps": 1.0,
+            "bps": 5.0,
+            "data_source": "default"
         }
     
     def _analyze_valuation(

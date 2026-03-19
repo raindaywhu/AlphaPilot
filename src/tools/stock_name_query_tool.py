@@ -51,6 +51,47 @@ class StockNameQueryTool:
             self._load_stock_list()
             logger.info("StockNameQueryTool 初始化完成")
     
+    def _is_stock_code(self, code: str, name: str) -> bool:
+        """
+        判断是否为有效股票代码（排除指数、基金、债券等）
+        
+        指数代码特征：
+        - 上证指数: 000001-000999, 9xxxxx
+        - 深证指数: 399001-399999
+        - 基金: 51xxxx, 15xxxx
+        - 债券: 01xxxx, 10xxxx, 11xxxx, 12xxxx, 13xxxx
+        """
+        # 指数名称关键词
+        index_keywords = ['指数', 'Ａ股', 'A股', '综指', '成指', 'ETF']
+        
+        # 检查名称是否包含指数关键词
+        for keyword in index_keywords:
+            if keyword in name:
+                return False
+        
+        # 深证指数: 399xxx
+        if code.startswith('399'):
+            return False
+        
+        # 上证指数: 9xxxxx (不包括普通股票)
+        if code.startswith('9') and not code.startswith('60'):
+            return False
+        
+        # 基金代码: 51xxxx, 15xxxx, 16xxxx, 50xxxx
+        if code.startswith('51') or code.startswith('15') or code.startswith('16') or code.startswith('50'):
+            return False
+        
+        # 债券代码: 01xxxx, 10xxxx, 11xxxx, 12xxxx, 13xxxx
+        if code.startswith('01') or code.startswith('10') or code.startswith('11') or code.startswith('12') or code.startswith('13'):
+            return False
+        
+        # 上证指数特别处理: 000xxx 只有在名称包含指数关键词时才过滤
+        # 深圳股票 000xxx 是正常股票（如 000001 平安银行，000426 兴业银锡）
+        if code.startswith('000') and '指数' in name:
+            return False
+        
+        return True
+    
     def _load_stock_list(self):
         """加载股票列表"""
         try:
@@ -67,19 +108,27 @@ class StockNameQueryTool:
             
             if sh_stocks is not None and len(sh_stocks) > 0:
                 for _, row in sh_stocks.iterrows():
-                    stocks.append({
-                        'code': str(row['code']).zfill(6),  # 补齐6位
-                        'name': row['name'],
-                        'market': 'SH'
-                    })
+                    code = str(row['code']).zfill(6)  # 补齐6位
+                    name = row['name']
+                    # 过滤非股票代码
+                    if self._is_stock_code(code, name):
+                        stocks.append({
+                            'code': code,
+                            'name': name,
+                            'market': 'SH'
+                        })
             
             if sz_stocks is not None and len(sz_stocks) > 0:
                 for _, row in sz_stocks.iterrows():
-                    stocks.append({
-                        'code': str(row['code']).zfill(6),  # 补齐6位
-                        'name': row['name'],
-                        'market': 'SZ'
-                    })
+                    code = str(row['code']).zfill(6)  # 补齐6位
+                    name = row['name']
+                    # 过滤非股票代码
+                    if self._is_stock_code(code, name):
+                        stocks.append({
+                            'code': code,
+                            'name': name,
+                            'market': 'SZ'
+                        })
             
             self._stock_list = pd.DataFrame(stocks)
             logger.info(f"成功加载 {len(stocks)} 只股票")

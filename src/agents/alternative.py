@@ -2,7 +2,7 @@
 """
 另类数据分析师 Agent
 
-分析北向资金、市场情绪、大宗商品等另类数据 - 使用 akshare 真实 API
+分析北向资金、市场情绪、大宗商品等另类数据
 
 Issue: (AGENT-003)
 """
@@ -14,11 +14,24 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 import re
 
+# 加载 .env 文件
+from pathlib import Path
+env_file = Path(__file__).parent.parent.parent / ".env"
+if env_file.exists():
+    with open(env_file) as f:
+        for line in f:
+            if '=' in line and not line.startswith('#'):
+                key, value = line.strip().split('=', 1)
+                os.environ.setdefault(key, value)
+
 # 设置环境变量以绕过 CrewAI 的 OPENAI_API_KEY 检查
 os.environ.setdefault('OPENAI_API_KEY', 'sk-dummy-key-for-crewai')
 
 from crewai import Agent
 from langchain_openai import ChatOpenAI
+
+# 导入统一数据获取模块
+from src.tools.data_fetcher import get_fetcher
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -380,72 +393,130 @@ class AlternativeAnalyst:
 
     def _fetch_commodity_data(self) -> Dict[str, Any]:
         """
-        从 akshare 获取大宗商品数据
+        获取大宗商品数据（使用 akshare futures_main_sina 获取主力合约数据）
 
         Returns:
             大宗商品数据字典
         """
-        ak = self._get_akshare()
+        import os
+        # 禁用代理
+        old_proxy = {}
+        for key in ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY']:
+            old_proxy[key] = os.environ.get(key)
+            if key in os.environ:
+                del os.environ[key]
         
         try:
-            # 获取主要大宗商品行情
-            df = ak.futures_display_main_sina()
+            ak = self._get_akshare()
             
             result = {}
-            
-            # 提取主要商品
             commodities = {
-                "铜": "CU0",  # 铜连续
-                "铝": "AL0",  # 铝连续
-                "原油": "SC0",  # 原油连续
-                "黄金": "AU0",  # 黄金连续
+                "铜": "CU0",
+                "铝": "AL0",
+                "原油": "SC0",
+                "黄金": "AU0",
             }
             
-            for name, symbol in commodities.items():
+            for name, code in commodities.items():
                 try:
-                    row = df[df['symbol'] == symbol]
-                    if len(row) > 0:
+                    # 使用 futures_main_sina 获取主力合约历史数据
+                    df = ak.futures_main_sina(symbol=code)
+                    if df is not None and len(df) >= 2:
+                        latest = df.iloc[-1]
+                        prev = df.iloc[-2]
+                        close = float(latest['收盘价'])
+                        prev_close = float(prev['收盘价'])
+                        change_pct = round((close - prev_close) / prev_close * 100, 2)
+                        
                         result[name] = {
-                            "symbol": symbol,
-                            "exchange": row.iloc[0].get('exchange', ''),
-                            "name": row.iloc[0].get('name', name),
-                            "price": row.iloc[0].get('最新价', row.iloc[0].get('close', 'N/A')),
-                            "change_pct": row.iloc[0].get('涨跌幅', 'N/A')
+                            "code": code,
+                            "price": close,
+                            "change_pct": change_pct,
+                            "date": str(latest['日期'])
                         }
-                except:
-                    pass
+                        logger.info(f"获取{name}数据成功: {close} ({change_pct}%)")
+                except Exception as e:
+                    logger.warning(f"获取{name}数据失败: {e}")
             
-            # 如果找不到具体数据，返回市场概况
-            if not result:
-                result["market_overview"] = {
-                    "total_commodities": len(df),
-                    "note": "大宗商品市场正常交易中"
+            # 恢复代理
+            for key, value in old_proxy.items():
+                if value:
+                    os.environ[key] = value
+            
+            if result:
+                return {
+                    "source": "akshare_sina",
+                    "data": result,
+                    "note": "期货主力合约数据"
                 }
-            
-            return result
-            
         except Exception as e:
-            logger.error(f"获取大宗商品数据失败: {e}")
-            return {
-                "error": "无法获取大宗商品数据",
-                "note": "请检查网络连接"
-            }
+            logger.error(f"大宗商品数据获取失败: {e}")
+        
+        # 恢复代理
+        for key, value in old_proxy.items():
+            if value:
+                os.environ[key] = value
+        
+        # 回退：返回分析框架
+        return {
+            "source": "analysis_framework",
+            "note": "期货实时数据暂不可用，以下为分析框架",
+            "key_commodities": {
+                "铜": {
+                    "impact_sectors": ["电力设备", "家电", "汽车", "电子"],
+                    "price_trend": "关注 LME 铜价和沪铜主力合约",
+                    "investment_logic": "铜价上涨利好铜矿企业，利空高耗铜企业"
+                },
+                "铝": {
+                    "impact_sectors": ["建筑", "汽车", "包装", "电力"],
+                    "price_trend": "关注沪铝主力合约和 LME 铝价",
+                    "investment_logic": "铝价上涨利好电解铝企业，关注成本端"
+                },
+                "钢铁": {
+                    "impact_sectors": ["建筑", "机械", "汽车", "家电"],
+                    "price_trend": "关注螺纹钢、热卷期货价格",
+                    "investment_logic": "钢价上涨利好钢企，关注铁矿石成本"
+                },
+                "原油": {
+                    "impact_sectors": ["化工", "交运", "航空", "航运"],
+                    "price_trend": "关注布伦特、WTI 原油价格",
+                    "investment_logic": "油价上涨利好油企，利空航空物流"
+                },
+                "黄金": {
+                    "impact_sectors": ["黄金开采", "珠宝", "投资"],
+                    "price_trend": "关注 COMEX 黄金、沪金主力",
+                    "investment_logic": "金价上涨利好黄金股，避险情绪指标"
+                }
+            },
+            "analysis_tips": [
+                "1. 判断目标股票所属行业对哪些大宗商品敏感",
+                "2. 评估大宗商品价格趋势（上涨/下跌/震荡）",
+                "3. 分析成本端和收入端的双重影响",
+                "4. 考虑企业的定价能力和成本转嫁能力"
+            ],
+            "data_sources_recommend": [
+                "东方财富期货频道: https://quote.eastmoney.com/center/qihuo.html",
+                "新浪财经期货: https://finance.sina.com.cn/futuremarket/",
+                "金十数据: https://www.jin10.com/"
+            ]
+        }
 
     def _fetch_sentiment_data(self) -> Dict[str, Any]:
         """
-        从 akshare 获取市场情绪数据
+        从腾讯财经获取市场情绪数据（替代失败的 akshare 东方财富接口）
 
         Returns:
             市场情绪数据字典
         """
-        ak = self._get_akshare()
+        import requests
         
         result = {
             "market_sentiment": "中性",
-            "indices": {}
+            "indices": {},
+            "data_source": "tencent"
         }
         
-        # 临时禁用代理（akshare 的东方财富 API 不支持代理）
+        # 临时禁用代理
         import os
         old_proxy = {}
         for key in ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY']:
@@ -453,34 +524,44 @@ class AlternativeAnalyst:
             if key in os.environ:
                 del os.environ[key]
         
-        # 重试机制
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                # 获取大盘指数（设置超时）
-                df = ak.stock_zh_index_spot_em()
-                
-                # 提取主要指数
-                indices = ["上证指数", "深证成指", "创业板指"]
-                
-                for idx_name in indices:
-                    try:
-                        row = df[df['名称'] == idx_name]
-                        if len(row) > 0:
-                            change_pct = float(row.iloc[0].get('涨跌幅', 0))
-                            result["indices"][idx_name] = {
-                                "price": float(row.iloc[0].get('最新价', 0)),
-                                "change_pct": round(change_pct, 2)
-                            }
-                    except:
-                        pass
-                
-                # 计算市场情绪
-                total_change = sum(
-                    v.get("change_pct", 0) 
-                    for v in result["indices"].values()
-                )
-                avg_change = total_change / len(result["indices"]) if result["indices"] else 0
+        try:
+            # 腾讯财经指数接口
+            indices_map = {
+                "上证指数": "sh000001",
+                "深证成指": "sz399001", 
+                "创业板指": "sz399006"
+            }
+            
+            codes = list(indices_map.values())
+            url = f"http://qt.gtimg.cn/q={','.join(codes)}"
+            
+            resp = requests.get(url, timeout=10)
+            if resp.status_code == 200:
+                lines = resp.text.strip().split('\n')
+                for line in lines:
+                    if '~' not in line:
+                        continue
+                    parts = line.split('~')
+                    if len(parts) >= 33:
+                        # 解析代码
+                        code_part = parts[0].split('=')[0].replace('v_', '')
+                        # 找到对应的指数名称
+                        for name, tc in indices_map.items():
+                            if tc in code_part.lower():
+                                current = float(parts[3])
+                                change = float(parts[31])
+                                pct = float(parts[32])
+                                result["indices"][name] = {
+                                    "price": current,
+                                    "change": change,
+                                    "change_pct": round(pct, 2)
+                                }
+                                break
+            
+            # 计算市场情绪
+            if result["indices"]:
+                total_pct = sum(v.get("change_pct", 0) for v in result["indices"].values())
+                avg_change = total_pct / len(result["indices"])
                 
                 if avg_change > 1.0:
                     result["market_sentiment"] = "偏乐观"
@@ -490,29 +571,21 @@ class AlternativeAnalyst:
                     result["market_sentiment"] = "中性"
                 
                 result["avg_change_pct"] = round(avg_change, 2)
+                logger.info(f"成功获取市场情绪数据: {result['market_sentiment']}, 平均涨幅: {avg_change:.2f}%")
+            else:
+                result["error"] = "未能获取指数数据"
+                result["market_sentiment"] = "未知"
                 
-                # 恢复代理设置
-                for key, value in old_proxy.items():
-                    if value:
-                        os.environ[key] = value
-                return result
-                
-            except Exception as e:
-                logger.warning(f"获取市场情绪数据失败 (尝试 {attempt + 1}/{max_retries}): {e}")
-                if attempt < max_retries - 1:
-                    import time
-                    time.sleep(1)  # 等待 1 秒后重试
-                else:
-                    logger.error(f"获取市场情绪数据最终失败: {e}")
+        except Exception as e:
+            logger.error(f"获取市场情绪数据失败: {e}")
+            result["error"] = str(e)
+            result["market_sentiment"] = "未知"
         
         # 恢复代理设置
         for key, value in old_proxy.items():
             if value:
                 os.environ[key] = value
         
-        # 所有重试都失败，返回默认值
-        result["error"] = "无法获取市场情绪数据（已重试）"
-        result["market_sentiment"] = "未知"
         return result
 
     def _extract_json(self, text: str) -> Dict[str, Any]:
