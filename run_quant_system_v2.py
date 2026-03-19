@@ -17,7 +17,7 @@ from crewai import Agent, Task, Crew, Process, LLM
 # 创建 LLM
 llm = LLM(
     model="glm-5",
-    api_key="REDACTED_API_KEY",
+    api_key="YOUR_GLM_API_KEY",
     base_url="https://coding.dashscope.aliyuncs.com/v1",
     temperature=0.7
 )

@@ -730,7 +730,7 @@ from langchain_openai import ChatOpenAI
 GLM5_LLM = ChatOpenAI(
     model="glm-5",
     openai_api_base="https://coding.dashscope.aliyuncs.com/v1",
-    openai_api_key="REDACTED_API_KEY",
+    openai_api_key="YOUR_GLM_API_KEY",
     temperature=0.3
 )
 
