@@ -70,12 +70,13 @@ class InvestmentAnalysisFlow:
             "report_path": None
         }
     
-    def run(self, stock_code: str, parallel: bool = True) -> Dict[str, Any]:
+    def run(self, stock_code: str, stock_name: str = None, parallel: bool = True) -> Dict[str, Any]:
         """
         执行完整工作流
         
         Args:
             stock_code: 股票代码
+            stock_name: 股票名称（可选，由 API 层传入）
             parallel: 是否并行执行分析
         
         Returns:
@@ -86,7 +87,7 @@ class InvestmentAnalysisFlow:
         
         try:
             # 阶段 1: 数据准备
-            self._prepare_data(stock_code)
+            self._prepare_data(stock_code, stock_name)
             
             # 阶段 2: 并行分析
             if parallel:
@@ -129,7 +130,7 @@ class InvestmentAnalysisFlow:
                 "error": str(e)
             }
     
-    def _prepare_data(self, stock_code: str):
+    def _prepare_data(self, stock_code: str, stock_name: str = None):
         """
         阶段 1: 数据准备
         
@@ -142,13 +143,17 @@ class InvestmentAnalysisFlow:
         # 设置股票代码
         self.state["stock_code"] = stock_code
         
-        # 使用 StockLookupTool 获取股票名称
-        stock_info = StockLookupTool.lookup(stock_code)
-        if stock_info:
-            self.state["stock_code"] = stock_info["code"]  # 标准化代码
-            self.state["stock_name"] = stock_info["name"]
+        # 优先使用传入的股票名称
+        if stock_name:
+            self.state["stock_name"] = stock_name
         else:
-            self.state["stock_name"] = stock_code
+            # 使用 StockLookupTool 获取股票名称（备用）
+            stock_info = StockLookupTool.lookup(stock_code)
+            if stock_info:
+                self.state["stock_code"] = stock_info["code"]  # 标准化代码
+                self.state["stock_name"] = stock_info["name"]
+            else:
+                self.state["stock_name"] = stock_code
         
         # 检查 qlib 数据
         try:

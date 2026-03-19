@@ -239,9 +239,10 @@ async def analyze_stock(request: AnalyzeRequest):
         # 初始化 Flow（使用工作流编排）
         flow = InvestmentAnalysisFlow()
         
-        # 执行分析
+        # 执行分析（传递股票名称）
         result = flow.run(
             stock_code=stock_code,
+            stock_name=stock_name,
             parallel=request.parallel
         )
         
